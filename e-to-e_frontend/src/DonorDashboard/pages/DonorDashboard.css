@@ -1381,6 +1381,48 @@
     border-bottom: 1px solid rgba(212, 204, 202, 0.2);
 }
 
+.dd-profile-details-card__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 20px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid rgba(212, 204, 202, 0.2);
+}
+
+.dd-profile-details-card__header .dd-profile-details-card__label {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+}
+
+.dd-profile-edit-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.dd-profile-edit-btn {
+    border: 1px solid rgba(68, 60, 60, 0.25);
+    background: var(--tundora);
+    color: var(--white);
+    border-radius: 8px;
+    padding: 7px 12px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.dd-profile-edit-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.dd-profile-edit-btn--secondary {
+    background: transparent;
+    color: var(--text-primary);
+}
+
 .dd-profile-details-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -1405,6 +1447,50 @@
     font-size: 0.95rem;
     font-weight: 500;
     color: var(--text-primary);
+}
+
+.dd-profile-form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px 16px;
+}
+
+.dd-profile-form-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.dd-profile-form-field span {
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--boulder);
+}
+
+.dd-profile-form-field input {
+    border: 1px solid rgba(212, 204, 202, 0.4);
+    border-radius: 8px;
+    padding: 9px 11px;
+    font-size: 0.9rem;
+    color: var(--text-primary);
+    background: var(--white);
+}
+
+.dd-profile-form-checkbox {
+    grid-column: 1 / -1;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.86rem;
+    color: var(--text-primary);
+}
+
+.dd-profile-form-error {
+    grid-column: 1 / -1;
+    color: #b00020;
+    font-size: 0.82rem;
 }
 
 /* Impact Grid */
@@ -1696,6 +1782,15 @@
 
     .dd-profile-details-grid {
         grid-template-columns: 1fr;
+    }
+
+    .dd-profile-form-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .dd-profile-details-card__header {
+        flex-direction: column;
+        align-items: flex-start;
     }
 
     .dd-profile-impact-grid {

@@ -1,14 +1,28 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { gsap } from 'gsap'
 
-export default function ProfileSection({ user, donorProfile, impact }) {
+export default function ProfileSection({ user, donorProfile, impact, onSave }) {
     const { t } = useTranslation('dashboard')
     const panelRef = useRef(null)
+    const [isEditing, setIsEditing] = useState(false)
+    const [saving, setSaving] = useState(false)
+    const [saveError, setSaveError] = useState('')
+    const [form, setForm] = useState({
+        full_name: '',
+        phone: '',
+        organization_name: '',
+        business_type: '',
+        address: '',
+        city: '',
+        latitude: '',
+        longitude: '',
+        csr_participant: false,
+    })
 
     const email = user?.email || ''
     const avatarLetter = email ? email.charAt(0).toUpperCase() : 'D'
-    const displayName = user?.full_name || 'Donor'
+    const displayName = user?.full_name || donorProfile?.profiles?.full_name || 'Donor'
     const role = user?.role || 'donor'
 
     useEffect(() => {
@@ -26,13 +40,60 @@ export default function ProfileSection({ user, donorProfile, impact }) {
         )
     }, [])
 
+    useEffect(() => {
+        setForm({
+            full_name: user?.full_name || donorProfile?.profiles?.full_name || '',
+            phone: user?.phone || donorProfile?.profiles?.phone || '',
+            organization_name: user?.organization_name || donorProfile?.profiles?.organization_name || '',
+            business_type: donorProfile?.business_type || '',
+            address: donorProfile?.address || '',
+            city: donorProfile?.city || '',
+            latitude: donorProfile?.latitude != null ? String(donorProfile.latitude) : '',
+            longitude: donorProfile?.longitude != null ? String(donorProfile.longitude) : '',
+            csr_participant: Boolean(donorProfile?.csr_participant),
+        })
+    }, [user, donorProfile])
+
+    const handleChange = (field, value) => {
+        setForm((prev) => ({ ...prev, [field]: value }))
+    }
+
+    const handleSave = async () => {
+        setSaveError('')
+        setSaving(true)
+        try {
+            const payload = {
+                full_name: form.full_name || null,
+                phone: form.phone || null,
+                organization_name: form.organization_name || null,
+                business_type: form.business_type || null,
+                address: form.address || null,
+                city: form.city || null,
+                csr_participant: Boolean(form.csr_participant),
+            }
+
+            if (form.latitude !== '') payload.latitude = Number(form.latitude)
+            if (form.longitude !== '') payload.longitude = Number(form.longitude)
+
+            if (Number.isNaN(payload.latitude)) delete payload.latitude
+            if (Number.isNaN(payload.longitude)) delete payload.longitude
+
+            await onSave(payload)
+            setIsEditing(false)
+        } catch (err) {
+            setSaveError(err?.message || err?.error || 'Failed to update profile')
+        } finally {
+            setSaving(false)
+        }
+    }
+
     const details = [
         { label: t('fullName'), value: displayName },
-        { label: t('emailAddress'), value: email || '—' },
-        { label: t('phone'), value: user?.phone || '—' },
+        { label: t('emailAddress'), value: email || '-' },
+        { label: t('phone'), value: user?.phone || donorProfile?.profiles?.phone || '-' },
         { label: t('role'), value: role.charAt(0).toUpperCase() + role.slice(1) },
-        { label: t('organization'), value: user?.organization_name || donorProfile?.organization_name || '—' },
-        { label: t('address'), value: donorProfile?.address || user?.address || '—' },
+        { label: t('organization'), value: user?.organization_name || donorProfile?.profiles?.organization_name || '-' },
+        { label: t('address'), value: donorProfile?.address || '-' },
         { label: t('csrParticipant'), value: donorProfile?.csr_participant ? t('yes') : t('no') },
         {
             label: t('memberSince'),
@@ -42,20 +103,19 @@ export default function ProfileSection({ user, donorProfile, impact }) {
                     month: 'long',
                     year: 'numeric',
                 })
-                : '—',
+                : '-',
         },
     ]
 
     const impactStats = [
-        { label: t('totalDonationsCount'), value: impact?.listing_count ?? '—' },
-        { label: t('mealsShared'), value: impact?.total_meals ?? '—' },
-        { label: t('co2Reduced'), value: impact?.total_co2_kg ? `${impact.total_co2_kg.toFixed(1)} kg` : '—' },
-        { label: t('foodSaved'), value: impact?.total_food_kg ? `${impact.total_food_kg} kg` : '—' },
+        { label: t('totalDonationsCount'), value: impact?.listing_count ?? '-' },
+        { label: t('mealsShared'), value: impact?.total_meals ?? '-' },
+        { label: t('co2Reduced'), value: impact?.total_co2_kg ? `${impact.total_co2_kg.toFixed(1)} kg` : '-' },
+        { label: t('foodSaved'), value: impact?.total_food_kg ? `${impact.total_food_kg} kg` : '-' },
     ]
 
     return (
         <div className="dd-profile-view" ref={panelRef}>
-            {/* ── Identity Card ── */}
             <div className="dd-profile-identity">
                 <div className="dd-profile-identity__left">
                     <div className="dd-profile-identity__avatar">
@@ -81,20 +141,94 @@ export default function ProfileSection({ user, donorProfile, impact }) {
                 </div>
             </div>
 
-            {/* ── Details Grid ── */}
             <div className="dd-profile-details-card">
-                <span className="dd-profile-details-card__label">{t('personalInformation')}</span>
-                <div className="dd-profile-details-grid">
-                    {details.map((d) => (
-                        <div key={d.label} className="dd-profile-detail-item">
-                            <span className="dd-profile-detail-item__label">{d.label}</span>
-                            <span className="dd-profile-detail-item__value">{d.value}</span>
+                <div className="dd-profile-details-card__header">
+                    <span className="dd-profile-details-card__label">{t('personalInformation')}</span>
+                    {!isEditing ? (
+                        <button type="button" className="dd-profile-edit-btn" onClick={() => setIsEditing(true)}>
+                            Edit Profile
+                        </button>
+                    ) : (
+                        <div className="dd-profile-edit-actions">
+                            <button
+                                type="button"
+                                className="dd-profile-edit-btn dd-profile-edit-btn--secondary"
+                                onClick={() => {
+                                    setIsEditing(false)
+                                    setSaveError('')
+                                }}
+                                disabled={saving}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                className="dd-profile-edit-btn"
+                                onClick={handleSave}
+                                disabled={saving}
+                            >
+                                {saving ? 'Saving...' : 'Save Changes'}
+                            </button>
                         </div>
-                    ))}
+                    )}
                 </div>
+
+                {!isEditing ? (
+                    <div className="dd-profile-details-grid">
+                        {details.map((d) => (
+                            <div key={d.label} className="dd-profile-detail-item">
+                                <span className="dd-profile-detail-item__label">{d.label}</span>
+                                <span className="dd-profile-detail-item__value">{d.value}</span>
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <div className="dd-profile-form-grid">
+                        <label className="dd-profile-form-field">
+                            <span>Full Name</span>
+                            <input value={form.full_name} onChange={(e) => handleChange('full_name', e.target.value)} />
+                        </label>
+                        <label className="dd-profile-form-field">
+                            <span>Phone</span>
+                            <input value={form.phone} onChange={(e) => handleChange('phone', e.target.value)} />
+                        </label>
+                        <label className="dd-profile-form-field">
+                            <span>Organization</span>
+                            <input value={form.organization_name} onChange={(e) => handleChange('organization_name', e.target.value)} />
+                        </label>
+                        <label className="dd-profile-form-field">
+                            <span>Business Type</span>
+                            <input value={form.business_type} onChange={(e) => handleChange('business_type', e.target.value)} />
+                        </label>
+                        <label className="dd-profile-form-field">
+                            <span>Address</span>
+                            <input value={form.address} onChange={(e) => handleChange('address', e.target.value)} />
+                        </label>
+                        <label className="dd-profile-form-field">
+                            <span>City</span>
+                            <input value={form.city} onChange={(e) => handleChange('city', e.target.value)} />
+                        </label>
+                        <label className="dd-profile-form-field">
+                            <span>Latitude</span>
+                            <input value={form.latitude} onChange={(e) => handleChange('latitude', e.target.value)} />
+                        </label>
+                        <label className="dd-profile-form-field">
+                            <span>Longitude</span>
+                            <input value={form.longitude} onChange={(e) => handleChange('longitude', e.target.value)} />
+                        </label>
+                        <label className="dd-profile-form-checkbox">
+                            <input
+                                type="checkbox"
+                                checked={form.csr_participant}
+                                onChange={(e) => handleChange('csr_participant', e.target.checked)}
+                            />
+                            <span>CSR Participant</span>
+                        </label>
+                        {saveError ? <div className="dd-profile-form-error">{saveError}</div> : null}
+                    </div>
+                )}
             </div>
 
-            {/* ── Impact Summary ── */}
             <div className="dd-profile-details-card">
                 <span className="dd-profile-details-card__label">{t('impactSummary')}</span>
                 <div className="dd-profile-impact-grid">

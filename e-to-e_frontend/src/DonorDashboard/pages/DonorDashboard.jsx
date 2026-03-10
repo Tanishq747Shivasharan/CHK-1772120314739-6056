@@ -17,6 +17,7 @@ import {
 import {
     getCurrentUser,
     getDonorProfile,
+    updateDonorProfile,
     getMyListings,
     getDonorImpact,
     getImpactSummary,
@@ -124,6 +125,22 @@ export default function DonorDashboard() {
     /* ── After donation success: refresh data ── */
     const handleDonationSuccess = () => {
         fetchDashboardData()
+    }
+
+    const handleProfileSave = async (updates) => {
+        const result = await updateDonorProfile(updates)
+        if (result?.donor) {
+            setDonorProfile(result.donor)
+            if (result.donor.profiles) {
+                setUser((prev) => ({
+                    ...prev,
+                    full_name: result.donor.profiles.full_name,
+                    phone: result.donor.profiles.phone,
+                    organization_name: result.donor.profiles.organization_name,
+                }))
+            }
+        }
+        return result
     }
 
     /* ── Derived data ── */
@@ -302,6 +319,7 @@ export default function DonorDashboard() {
                                 user={user}
                                 donorProfile={donorProfile}
                                 impact={impact}
+                                onSave={handleProfileSave}
                             />
                         </div>
                     )}
