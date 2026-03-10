@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { supabaseAdmin } = require('../config/supabaseClient');
 const { authenticateUser } = require('../middleware/authMiddleware');
-const { donorOnly } = require('../middleware/roleGuards');
+const { donorOnly, adminOnly } = require('../middleware/roleGuards');
 const { getDonorImpact } = require('../services/impactService');
 
 router.post('/', authenticateUser, donorOnly, async (req, res) => {
@@ -227,7 +227,7 @@ router.get('/:donor_id', async (req, res) => {
   }
 });
 
-router.get('/', async (req, res) => {
+router.get('/', authenticateUser, async (req, res) => {
   try {
     const { city, verified } = req.query;
 
@@ -236,11 +236,17 @@ router.get('/', async (req, res) => {
       .select(`
         donor_id,
         business_type,
+        address,
         city,
+        latitude,
+        longitude,
+        csr_participant,
         verification_status,
         created_at,
         profiles (
-          organization_name
+          organization_name,
+          phone,
+          email
         )
       `);
 
@@ -277,7 +283,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-router.put('/:donor_id/verify', authenticateUser, async (req, res) => {
+router.put('/:donor_id/verify', authenticateUser, adminOnly, async (req, res) => {
   try {
     const { donor_id } = req.params;
     const { verification_status } = req.body;

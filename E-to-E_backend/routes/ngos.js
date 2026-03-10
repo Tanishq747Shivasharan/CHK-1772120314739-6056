@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { supabaseAdmin } = require('../config/supabaseClient');
 const { authenticateUser } = require('../middleware/authMiddleware');
-const { ngoOnly } = require('../middleware/roleGuards');
+const { ngoOnly, adminOnly } = require('../middleware/roleGuards');
 const { getNGOImpact } = require('../services/impactService');
 
 router.post('/', authenticateUser, ngoOnly, async (req, res) => {
@@ -198,7 +198,7 @@ router.get('/me/impact', authenticateUser, ngoOnly, async (req, res) => {
   }
 });
 
-router.get('/', async (req, res) => {
+router.get('/', authenticateUser, async (req, res) => {
   try {
     const { city, verified } = req.query;
 
@@ -207,12 +207,17 @@ router.get('/', async (req, res) => {
       .select(`
         ngo_id,
         ngo_name,
+        address,
         city,
+        latitude,
+        longitude,
         service_radius_km,
         verification_status,
+        contact_person,
         created_at,
         profiles (
-          phone
+          phone,
+          email
         )
       `);
 
@@ -440,7 +445,7 @@ router.delete('/me/volunteers/:volunteer_id', authenticateUser, ngoOnly, async (
   }
 });
 
-router.put('/:ngo_id/verify', authenticateUser, async (req, res) => {
+router.put('/:ngo_id/verify', authenticateUser, adminOnly, async (req, res) => {
   try {
     const { ngo_id } = req.params;
     const { verification_status } = req.body;

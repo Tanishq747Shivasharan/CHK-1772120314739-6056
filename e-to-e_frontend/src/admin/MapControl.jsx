@@ -6,15 +6,15 @@ import 'leaflet/dist/leaflet.css'
 
 /* ── Custom marker icons using colored circles ── */
 const createIcon = (color, label = '') => {
-    const size = label ? 24 : 14
+    const size = label ? 26 : 14
     return L.divIcon({
         className: '',
         html: `<div style="
       width: ${size}px; height: ${size}px;
       background: ${color};
-      border: 2.5px solid #fff;
+      border: 2.5px solid rgba(255,255,255,0.9);
       border-radius: 50%;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.35);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -29,9 +29,12 @@ const createIcon = (color, label = '') => {
     })
 }
 
-const ngoIcon = createIcon('#443c3c', 'N')
-const donorIcon = createIcon('#6c7483', 'D')
-const listingIcon = createIcon('#2ecc71') // Brighter green dot for live donations
+// Vivid, clearly distinct colours
+const ngoIcon    = createIcon('#3498db', 'N')   // Blue   — NGO
+const donorIcon  = createIcon('#e67e22', 'D')   // Orange — Donor
+const openIcon   = createIcon('#2ecc71')         // Green  — Open listing
+const claimedIcon = createIcon('#9b59b6')        // Purple — Claimed listing
+const completedIcon = createIcon('#95a5a6')      // Grey   — Completed
 
 /* ── Map auto-fit sub-component ── */
 function MapFitter({ markers }) {
@@ -41,11 +44,20 @@ function MapFitter({ markers }) {
         if (!markers || markers.length === 0) return
         const bounds = L.latLngBounds(markers.map(m => [m.lat, m.lng]))
         if (bounds.isValid()) {
-            map.fitBounds(bounds, { padding: [40, 40], maxZoom: 12 })
+            map.fitBounds(bounds, { padding: [50, 50], maxZoom: 13 })
         }
     }, [markers, map])
 
     return null
+}
+
+const STATUS_ICON = {
+    open: openIcon,
+    in_discussion: claimedIcon,
+    claimed: claimedIcon,
+    scheduled: claimedIcon,
+    in_transit: claimedIcon,
+    completed: completedIcon,
 }
 
 export default function MapControl({ ngos, donors, listings }) {
@@ -53,12 +65,10 @@ export default function MapControl({ ngos, donors, listings }) {
     const [isReady, setIsReady] = useState(false)
 
     useEffect(() => {
-        // Small delay to avoid rendering map before layout settles
         const timer = setTimeout(() => setIsReady(true), 500)
         return () => clearTimeout(timer)
     }, [])
 
-    /* ── Zoom-in animation wrapper ── */
     useEffect(() => {
         if (!wrapRef.current || !isReady) return
         gsap.from(wrapRef.current, {
@@ -73,59 +83,63 @@ export default function MapControl({ ngos, donors, listings }) {
     /* ── Collect all markers ── */
     const allMarkers = []
 
-        ; (ngos || []).forEach(n => {
-            if (n.latitude && n.longitude) {
-                allMarkers.push({
-                    lat: parseFloat(n.latitude),
-                    lng: parseFloat(n.longitude),
-                    type: 'ngo',
-                    label: n.ngo_name || 'NGO',
-                    detail: n.city || '',
-                })
-            }
-        })
+    ;(ngos || []).forEach(n => {
+        if (n.latitude && n.longitude) {
+            allMarkers.push({
+                lat: parseFloat(n.latitude),
+                lng: parseFloat(n.longitude),
+                type: 'ngo',
+                label: n.ngo_name || 'NGO',
+                detail: `${n.city || ''}${n.contact_person ? ` · ${n.contact_person}` : ''}`,
+                extra: n.verification_status ? '✓ Verified' : '⏳ Pending',
+                icon: ngoIcon,
+            })
+        }
+    })
 
-        ; (donors || []).forEach(d => {
-            if (d.latitude && d.longitude) {
-                allMarkers.push({
-                    lat: parseFloat(d.latitude),
-                    lng: parseFloat(d.longitude),
-                    type: 'donor',
-                    label: d.profiles?.organization_name || 'Donor',
-                    detail: d.city || '',
-                })
-            }
-        })
+    ;(donors || []).forEach(d => {
+        if (d.latitude && d.longitude) {
+            allMarkers.push({
+                lat: parseFloat(d.latitude),
+                lng: parseFloat(d.longitude),
+                type: 'donor',
+                label: d.profiles?.organization_name || 'Donor',
+                detail: d.city || '',
+                extra: d.business_type || '',
+                icon: donorIcon,
+            })
+        }
+    })
 
-        ; (listings || []).forEach(l => {
-            if (l.latitude && l.longitude) {
-                allMarkers.push({
-                    lat: parseFloat(l.latitude),
-                    lng: parseFloat(l.longitude),
-                    type: 'listing',
-                    label: l.food_type || 'Donation',
-                    detail: `${l.quantity_kg || 0} kg · ${l.status || 'open'}`,
-                })
-            }
-        })
+    ;(listings || []).forEach(l => {
+        if (l.latitude && l.longitude) {
+            allMarkers.push({
+                lat: parseFloat(l.latitude),
+                lng: parseFloat(l.longitude),
+                type: 'listing',
+                label: l.food_type || 'Donation',
+                detail: `${l.quantity_kg || 0} kg`,
+                extra: l.status || 'open',
+                icon: STATUS_ICON[l.status] || openIcon,
+            })
+        }
+    })
 
     const center = allMarkers.length > 0
         ? [allMarkers[0].lat, allMarkers[0].lng]
-        : [20.5937, 78.9629] // India center fallback
+        : [20.5937, 78.9629]   // India centre fallback
 
-    const getIcon = (type) => {
-        if (type === 'ngo') return ngoIcon
-        if (type === 'donor') return donorIcon
-        return listingIcon
-    }
+    const ngoCount    = allMarkers.filter(m => m.type === 'ngo').length
+    const donorCount  = allMarkers.filter(m => m.type === 'donor').length
+    const listingCount = allMarkers.filter(m => m.type === 'listing').length
 
     return (
         <section className="admin-section">
             <div className="admin-section__header">
                 <div>
-                    <h2 className="admin-section__title">Live Donation Monitor</h2>
+                    <h2 className="admin-section__title">Live Resource Map</h2>
                     <p className="admin-section__subtitle">
-                        Mapped active food listings
+                        {ngoCount} NGOs · {donorCount} Donors · {listingCount} Donations
                     </p>
                 </div>
             </div>
@@ -147,14 +161,16 @@ export default function MapControl({ ngos, donors, listings }) {
                         <MapFitter markers={allMarkers} />
 
                         {allMarkers.map((m, i) => (
-                            <Marker key={`${m.type}-${i}`} position={[m.lat, m.lng]} icon={getIcon(m.type)}>
+                            <Marker key={`${m.type}-${i}`} position={[m.lat, m.lng]} icon={m.icon}>
                                 <Popup>
-                                    <div style={{ fontFamily: 'var(--font-sans)', fontSize: '0.82rem' }}>
-                                        <strong>{m.label}</strong>
-                                        <br />
-                                        <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>
+                                    <div style={{ fontFamily: 'var(--font-sans, sans-serif)', fontSize: '0.82rem', minWidth: 140 }}>
+                                        <div style={{ fontWeight: 700, marginBottom: 2 }}>{m.label}</div>
+                                        <div style={{ color: '#666', fontSize: '0.72rem', marginBottom: 2 }}>
                                             {m.type.toUpperCase()} · {m.detail}
-                                        </span>
+                                        </div>
+                                        {m.extra && (
+                                            <div style={{ fontSize: '0.7rem', color: '#888' }}>{m.extra}</div>
+                                        )}
                                     </div>
                                 </Popup>
                             </Marker>
@@ -162,19 +178,30 @@ export default function MapControl({ ngos, donors, listings }) {
                     </MapContainer>
                 )}
 
+                {allMarkers.length === 0 && isReady && (
+                    <div className="admin-empty" style={{ position: 'absolute', inset: 0, zIndex: 10, background: 'rgba(0,0,0,0.4)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                        <p className="admin-empty__text" style={{ color: '#ccc' }}>No geo-located data yet.</p>
+                        <p className="admin-empty__hint" style={{ color: '#aaa' }}>Donors and NGOs need to register with location details.</p>
+                    </div>
+                )}
+
                 {/* Legend */}
                 <div className="admin-map-legend">
                     <div className="admin-map-legend__item">
-                        <span className="admin-map-legend__color" style={{ background: '#443c3c' }} />
+                        <span className="admin-map-legend__color" style={{ background: '#3498db' }} />
                         NGOs
                     </div>
                     <div className="admin-map-legend__item">
-                        <span className="admin-map-legend__color" style={{ background: '#6c7483' }} />
+                        <span className="admin-map-legend__color" style={{ background: '#e67e22' }} />
                         Donors
                     </div>
                     <div className="admin-map-legend__item">
-                        <span className="admin-map-legend__color" style={{ background: '#6abf69' }} />
-                        Active Pickups
+                        <span className="admin-map-legend__color" style={{ background: '#2ecc71' }} />
+                        Open Donations
+                    </div>
+                    <div className="admin-map-legend__item">
+                        <span className="admin-map-legend__color" style={{ background: '#9b59b6' }} />
+                        Claimed/In-Transit
                     </div>
                 </div>
             </div>
