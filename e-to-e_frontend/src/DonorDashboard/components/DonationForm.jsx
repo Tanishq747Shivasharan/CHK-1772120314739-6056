@@ -1,24 +1,9 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet'
 import { playSuccessAnimation } from '../animations/dashboardAnimations'
 import { createListing } from '../../lib/donorApi'
 import { useSocket } from '../../context/SocketContext'
-import 'leaflet/dist/leaflet.css'
-import L from 'leaflet'
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
-
-/* Fix Leaflet default marker icon */
-delete L.Icon.Default.prototype._getIconUrl
-L.Icon.Default.mergeOptions({
-    iconRetinaUrl:
-        'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
-    iconUrl:
-        'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
-    shadowUrl:
-        'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-})
+import LocationPicker from '../../components/auth/LocationPicker'
 
 const FOOD_TYPES = [
     'Cooked Meals',
@@ -29,16 +14,6 @@ const FOOD_TYPES = [
     'Beverages',
     'Other',
 ]
-
-/* ── MapPicker sub-component ── */
-function MapClickHandler({ onMapClick }) {
-    useMapEvents({
-        click(e) {
-            onMapClick(e.latlng)
-        },
-    })
-    return null
-}
 
 export default function DonationForm({ onSuccess }) {
     const { t } = useTranslation('dashboard')
@@ -52,7 +27,6 @@ export default function DonationForm({ onSuccess }) {
         latitude: null,
         longitude: null,
     })
-    const [markerPos, setMarkerPos] = useState(null)
     const [submitting, setSubmitting] = useState(false)
     const [error, setError] = useState(null)
     const [success, setSuccess] = useState(false)
@@ -87,32 +61,13 @@ export default function DonationForm({ onSuccess }) {
         setForm((prev) => ({ ...prev, [name]: value }))
     }
 
-    /* ── Reverse geocode via backend proxy ── */
-    const reverseGeocode = useCallback(async (lat, lng) => {
-        try {
-            const res = await fetch(
-                `${API_URL}/geocode/reverse?format=json&lat=${lat}&lon=${lng}`
-            )
-            const data = await res.json()
-            return data.display_name || `${lat.toFixed(5)}, ${lng.toFixed(5)}`
-        } catch {
-            return `${lat.toFixed(5)}, ${lng.toFixed(5)}`
-        }
+    const handleCoordsChange = useCallback((lat, lng) => {
+        setForm((prev) => ({
+            ...prev,
+            latitude: lat,
+            longitude: lng,
+        }))
     }, [])
-
-    const handleMapClick = useCallback(
-        async (latlng) => {
-            setMarkerPos(latlng)
-            setForm((prev) => ({
-                ...prev,
-                latitude: latlng.lat,
-                longitude: latlng.lng,
-            }))
-            const address = await reverseGeocode(latlng.lat, latlng.lng)
-            setForm((prev) => ({ ...prev, pickup_address: address }))
-        },
-        [reverseGeocode]
-    )
 
     const handleSubmit = async (e) => {
         e.preventDefault()
@@ -165,7 +120,6 @@ export default function DonationForm({ onSuccess }) {
                 latitude: null,
                 longitude: null,
             })
-            setMarkerPos(null)
 
             if (onSuccess) onSuccess()
 
@@ -312,27 +266,14 @@ export default function DonationForm({ onSuccess }) {
                         <label className="dd-form-label">
                             {t('pickupLocationLabel')}
                         </label>
-                        <div className="dd-map-picker-wrapper">
-                            <MapContainer
-                                center={[17.6599, 75.9064]}
-                                zoom={13}
-                                className="dd-map-picker"
-                                scrollWheelZoom={true}
-                            >
-                                <TileLayer
-                                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                                />
-                                <MapClickHandler onMapClick={handleMapClick} />
-                                {markerPos && <Marker position={markerPos} />}
-                            </MapContainer>
-                        </div>
-                        {form.pickup_address && (
-                            <div className="dd-map-address">
-                                <span className="dd-map-address__icon">—</span>
-                                <span className="dd-map-address__text">{form.pickup_address}</span>
-                            </div>
-                        )}
+                        <LocationPicker
+                            address={form.pickup_address}
+                            onAddressChange={(address) =>
+                                setForm((prev) => ({ ...prev, pickup_address: address }))
+                            }
+                            onCityChange={() => { }}
+                            onCoordsChange={handleCoordsChange}
+                        />
                     </div>
                 </div>
 

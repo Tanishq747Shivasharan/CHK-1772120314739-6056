@@ -686,6 +686,28 @@
     box-shadow: 0 4px 16px rgba(68, 60, 60, 0.06);
 }
 
+.dd-map-current-btn {
+    align-self: flex-start;
+    margin-bottom: 10px;
+    border: 1px solid rgba(68, 60, 60, 0.25);
+    background: transparent;
+    color: var(--text-primary);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.dd-map-current-btn:hover {
+    background: rgba(212, 204, 202, 0.15);
+}
+
+.dd-map-current-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
 .dd-map-picker {
     height: 320px;
     width: 100%;

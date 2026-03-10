@@ -5,6 +5,7 @@ const NOMINATIM_BASE = 'https://nominatim.openstreetmap.org';
 
 router.get('/reverse', async (req, res) => {
     try {
+        
         const params = new URLSearchParams(req.query).toString();
         const url = `${NOMINATIM_BASE}/reverse?${params}`;
 
