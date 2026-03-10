@@ -10,15 +10,12 @@ import StoriesPage from './pages/StoriesPage'
 import ContactPage from './pages/ContactPage'
 import DonorDashboard from './DonorDashboard/pages/DonorDashboard'
 import NGODashboard from './modules/NGODashboard/pages/NGODashboard'
+import AdminDashboard from './admin/AdminDashboard'
 import ProtectedRoute from './components/ProtectedRoute'
 import CinematicPreloader from './components/CinematicPreloader'
 
 gsap.registerPlugin(ScrollTrigger)
 
-/*
- * Dashboard paths don't need Lenis smooth scroll — they have
- * their own overflow containers.  Only enable it for public pages.
- */
 const DASHBOARD_PREFIXES = ['/donor-dashboard', '/ngo-dashboard', '/admin-dashboard']
 
 import { useAuth } from './context/AuthContext'
@@ -28,7 +25,6 @@ function App() {
   const lenisRef = useRef(null)
   const location = useLocation()
   const [loading, setLoading] = useState(() => {
-    // Check if preloader has already been shown in this session
     return !sessionStorage.getItem('preloader-session-shown')
   })
 
@@ -43,9 +39,7 @@ function App() {
   )
 
   useEffect(() => {
-    // Don't initialise Lenis on dashboard pages
     if (isDashboard) {
-      // Kill any stale Lenis instance when navigating to a dashboard
       if (lenisRef.current) {
         lenisRef.current.destroy()
         lenisRef.current = null
@@ -113,6 +107,14 @@ function App() {
               element={
                 <ProtectedRoute allowedRoles={['ngo', 'volunteer']}>
                   <NGODashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin-dashboard"
+              element={
+                <ProtectedRoute allowedRoles={['admin']}>
+                  <AdminDashboard />
                 </ProtectedRoute>
               }
             />
