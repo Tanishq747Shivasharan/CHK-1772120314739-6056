@@ -3,8 +3,13 @@ const router = express.Router();
 const { supabaseAdmin } = require('../config/supabaseClient');
 const { authenticateUser } = require('../middleware/authMiddleware');
 const { donorOnly, ngoOnly } = require('../middleware/roleGuards');
-const { getAvailableListingsForNGO, matchListingToNGOs } = require('../services/geoMatchService');
-const { notifyNearbyNGOs, notifySpecificNGO } = require('../services/geoMatchService');
+const geoMatchService = require('../services/geoMatchService');
+const {
+  getAvailableListingsForNGO,
+  matchListingToNGOs,
+  notifyNearbyNGOs,
+  notifySpecificNGO
+} = geoMatchService;
 const { sendListingCreatedEmail } = require('../services/emailService');
 
 router.post('/', authenticateUser, donorOnly, async (req, res) => {
@@ -92,13 +97,27 @@ router.post('/', authenticateUser, donorOnly, async (req, res) => {
       });
     }
 
-    const notifyPromise = assigned_ngo_id
-      ? notifySpecificNGO(listing.listing_id, assigned_ngo_id)
-      : notifyNearbyNGOs(listing.listing_id);
+    try {
+      const notifyFn = assigned_ngo_id ? notifySpecificNGO : notifyNearbyNGOs;
 
-    notifyPromise.catch(err => {
-      console.error('Failed to notify NGOs:', err);
-    });
+      if (typeof notifyFn === 'function') {
+        Promise.resolve(
+          assigned_ngo_id
+            ? notifyFn(listing.listing_id, assigned_ngo_id)
+            : notifyFn(listing.listing_id)
+        ).catch(err => {
+          console.error('Failed to notify NGOs:', err);
+        });
+      } else {
+        console.warn(
+          assigned_ngo_id
+            ? 'notifySpecificNGO is not available in geoMatchService'
+            : 'notifyNearbyNGOs is not available in geoMatchService'
+        );
+      }
+    } catch (notifyErr) {
+      console.error('NGO notification dispatch error:', notifyErr);
+    }
 
     (async () => {
       try {
@@ -143,7 +162,7 @@ router.post('/', authenticateUser, donorOnly, async (req, res) => {
     })();
 
     res.status(201).json({
-      message: 'Food listing created successfully',
+      message: 'Donation created sucessfully All ngos have been notified',
       listing
     });
 
