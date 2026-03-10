@@ -7,7 +7,6 @@
     z-index: 9999;
     overflow: hidden;
     pointer-events: none;
-    /* Allows clicks pass through after fade, but we usually unmount */
     display: flex;
     align-items: center;
     justify-content: center;
@@ -80,6 +79,5 @@
     background-color: var(--tundora, #1a1a1a);
     transform-origin: center;
     z-index: 30;
-    /* Above text during split */
-    /* Width managed by GSAP */
+    
 }

@@ -93,8 +93,9 @@ router.get('/me', authenticateUser, ngoOnly, async (req, res) => {
       .single();
 
     if (error || !ngo) {
-      return res.status(404).json({
-        error: 'NGO profile not found'
+      return res.json({
+        ngo: null,
+        message: 'NGO profile not found'
       });
     }
 
