@@ -110,6 +110,9 @@ router.get('/me', authenticateUser, donorOnly, async (req, res) => {
 router.put('/me', authenticateUser, donorOnly, async (req, res) => {
   try {
     const {
+      full_name,
+      phone,
+      organization_name,
       business_type,
       address,
       city,
@@ -118,25 +121,64 @@ router.put('/me', authenticateUser, donorOnly, async (req, res) => {
       csr_participant
     } = req.body;
 
-    const updates = {};
-    if (business_type !== undefined) updates.business_type = business_type;
-    if (address !== undefined) updates.address = address;
-    if (city !== undefined) updates.city = city;
-    if (latitude !== undefined) updates.latitude = latitude;
-    if (longitude !== undefined) updates.longitude = longitude;
-    if (csr_participant !== undefined) updates.csr_participant = csr_participant;
+    const donorUpdates = {};
+    if (business_type !== undefined) donorUpdates.business_type = business_type;
+    if (address !== undefined) donorUpdates.address = address;
+    if (city !== undefined) donorUpdates.city = city;
+    if (latitude !== undefined) donorUpdates.latitude = latitude;
+    if (longitude !== undefined) donorUpdates.longitude = longitude;
+    if (csr_participant !== undefined) donorUpdates.csr_participant = csr_participant;
+
+    const profileUpdates = {};
+    if (full_name !== undefined) profileUpdates.full_name = full_name;
+    if (phone !== undefined) profileUpdates.phone = phone;
+    if (organization_name !== undefined) profileUpdates.organization_name = organization_name;
+
+    if (Object.keys(profileUpdates).length > 0) {
+      const { error: profileError } = await supabaseAdmin
+        .from('profiles')
+        .update(profileUpdates)
+        .eq('id', req.user.id);
+
+      if (profileError) {
+        return res.status(500).json({
+          error: 'Failed to update profile details',
+          message: profileError.message
+        });
+      }
+    }
+
+    if (Object.keys(donorUpdates).length > 0) {
+      const { error: donorUpdateError } = await supabaseAdmin
+        .from('donors')
+        .update(donorUpdates)
+        .eq('profile_id', req.user.id);
+
+      if (donorUpdateError) {
+        return res.status(500).json({
+          error: 'Failed to update donor profile',
+          message: donorUpdateError.message
+        });
+      }
+    }
 
     const { data: donor, error } = await supabaseAdmin
       .from('donors')
-      .update(updates)
+      .select(`
+        *,
+        profiles (
+          full_name,
+          email,
+          phone,
+          organization_name
+        )
+      `)
       .eq('profile_id', req.user.id)
-      .select()
       .single();
 
-    if (error) {
-      return res.status(500).json({
-        error: 'Failed to update donor profile',
-        message: error.message
+    if (error || !donor) {
+      return res.status(404).json({
+        error: 'Donor profile not found'
       });
     }
 

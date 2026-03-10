@@ -44,9 +44,9 @@ export default function MapPanel() {
 
     const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
 
-    /* NGO center */
-    const ngoLat = parseFloat(ngoProfile?.latitude) || 17.6599
-    const ngoLng = parseFloat(ngoProfile?.longitude) || 75.9064
+    /* Fixed map center */
+    const ngoLat = 17.674553
+    const ngoLng = 75.323726
 
     /* Active Donation Markers (Open listings) */
     const activeMarkers = useMemo(() => {

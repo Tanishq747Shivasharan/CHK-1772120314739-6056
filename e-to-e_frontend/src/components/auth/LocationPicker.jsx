@@ -11,7 +11,7 @@ L.Icon.Default.mergeOptions({
     shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 })
 
-/* ─── Solapur, India as default center ─── */
+/* ─── Default center ─── */
 const DEFAULT_CENTER = [17.6599, 75.9064]
 const DEFAULT_ZOOM = 12
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'

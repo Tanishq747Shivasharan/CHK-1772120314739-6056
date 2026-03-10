@@ -276,8 +276,8 @@ export const RegisterForm = forwardRef(function RegisterForm(
     const [contactPerson, setContactPerson] = useState('')
     const [ngoAddress, setNgoAddress] = useState('')
     const [ngoCity, setNgoCity] = useState('')
-    const [ngoLat, setNgoLat] = useState(null)
-    const [ngoLng, setNgoLng] = useState(null)
+    const [ngoLat, setNgoLat] = useState(17.674553)
+    const [ngoLng, setNgoLng] = useState(75.323726)
     const [serviceRadius, setServiceRadius] = useState(10)
 
     /* Step 2 — Volunteer fields */
