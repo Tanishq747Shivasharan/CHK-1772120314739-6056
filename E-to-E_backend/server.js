@@ -5,8 +5,20 @@ const cors = require('cors');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+const ALLOWED_ORIGINS = (process.env.CORS_ORIGIN || 'http://localhost:5173')
+  .split(',')
+  .map(o => o.trim())
+  .filter(Boolean)
+
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || '*',
+  origin: function (origin, callback) {
+    // Allow requests with no origin (e.g. curl / mobile apps)
+    if (!origin) return callback(null, true)
+    if (ALLOWED_ORIGINS.includes(origin) || ALLOWED_ORIGINS.includes('*')) {
+      return callback(null, true)
+    }
+    return callback(new Error(`CORS blocked: ${origin}`))
+  },
   credentials: true
 }));
 app.use(express.json());
@@ -123,7 +135,7 @@ const server = http.createServer(app);
 const { Server } = require("socket.io");
 const io = new Server(server, {
   cors: {
-    origin: process.env.CORS_ORIGIN || "*",
+    origin: ALLOWED_ORIGINS,
     methods: ["GET", "POST"],
     credentials: true
   }

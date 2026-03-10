@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { gsap } from 'gsap'
-import { Search, Building2, Check, X, Ban } from 'lucide-react'
+import { Search, Building2, Check, X, Ban, ChevronDown, ChevronUp } from 'lucide-react'
 import { verifyNGO } from '../lib/adminApi'
 
 function formatDate(ts) {
@@ -23,19 +23,27 @@ export default function NgoManagement({ ngos, onRefresh }) {
     const [search, setSearch] = useState('')
     const [filter, setFilter] = useState('all')
     const [actionLoading, setActionLoading] = useState(null)
+    const [expandedId, setExpandedId] = useState(null)
     const tableRef = useRef(null)
 
     useEffect(() => {
         if (!tableRef.current) return
-        const rows = tableRef.current.querySelectorAll('tbody tr')
-        gsap.from(rows, {
-            y: 20,
-            opacity: 0,
-            duration: 0.35,
-            stagger: 0.04,
-            ease: 'power2.out',
-            delay: 0.2,
+        // Use rAF so the DOM has fully painted before we query rows
+        const raf = requestAnimationFrame(() => {
+            const rows = tableRef.current?.querySelectorAll('tbody tr.ngo-main-row')
+            if (!rows || rows.length === 0) return
+            // Ensure rows are visible before animating (prevents stuck-at-0 on re-render)
+            gsap.set(rows, { opacity: 1, y: 0 })
+            gsap.from(rows, {
+                y: 16,
+                opacity: 0,
+                duration: 0.3,
+                stagger: 0.04,
+                ease: 'power2.out',
+                clearProps: 'all',   // ← removes inline styles after anim completes
+            })
         })
+        return () => cancelAnimationFrame(raf)
     }, [ngos, filter, search])
 
     const handleApprove = useCallback(async (ngoId) => {
@@ -78,6 +86,10 @@ export default function NgoManagement({ ngos, onRefresh }) {
             setActionLoading(null)
         }
     }, [onRefresh, t])
+
+    const toggleExpand = (ngoId) => {
+        setExpandedId(prev => prev === ngoId ? null : ngoId)
+    }
 
     const filtered = ngos.filter(ngo => {
         const matchSearch = !search ||
@@ -165,55 +177,100 @@ export default function NgoManagement({ ngos, onRefresh }) {
                         </thead>
                         <tbody>
                             {filtered.map(ngo => (
-                                <tr key={ngo.ngo_id}>
-                                    <td style={{ fontWeight: 600 }}>{ngo.ngo_name || '—'}</td>
-                                    <td>{ngo.city || '—'}</td>
-                                    <td>
-                                        <span className={`admin-badge ${ngo.verification_status ? 'admin-badge--verified' : 'admin-badge--pending'}`}>
-                                            <span className="admin-badge__dot" />
-                                            {ngo.verification_status ? t('verified') : t('pending')}
-                                        </span>
-                                    </td>
-                                    <td>{ngo.service_radius_km ? `${ngo.service_radius_km} km` : '—'}</td>
-                                    <td>{ngo.profiles?.phone || '—'}</td>
-                                    <td className="admin-log-timestamp">
-                                        {formatDate(ngo.created_at)}
-                                    </td>
-                                    <td>
-                                        <div className="admin-actions-cell">
-                                            {!ngo.verification_status && (
-                                                <>
-                                                    <button
-                                                        className="admin-action-btn admin-action-btn--approve"
-                                                        onClick={() => handleApprove(ngo.ngo_id)}
-                                                        disabled={actionLoading === ngo.ngo_id}
-                                                    >
-                                                        <Check size={12} strokeWidth={2.5} style={{ marginRight: 3 }} />
-                                                        {actionLoading === ngo.ngo_id ? t('approving') : t('approve')}
-                                                    </button>
-                                                    <button
-                                                        className="admin-action-btn admin-action-btn--deny"
-                                                        onClick={() => handleDeny(ngo.ngo_id)}
-                                                        disabled={actionLoading === ngo.ngo_id}
-                                                    >
-                                                        <X size={12} strokeWidth={2.5} style={{ marginRight: 3 }} />
-                                                        {t('deny')}
-                                                    </button>
-                                                </>
-                                            )}
-                                            {ngo.verification_status && (
+                                <>
+                                    <tr key={ngo.ngo_id} className="ngo-main-row">
+                                        <td style={{ fontWeight: 600 }}>{ngo.ngo_name || '—'}</td>
+                                        <td>{ngo.city || '—'}</td>
+                                        <td>
+                                            <span className={`admin-badge ${ngo.verification_status ? 'admin-badge--verified' : 'admin-badge--pending'}`}>
+                                                <span className="admin-badge__dot" />
+                                                {ngo.verification_status ? t('verified') : t('pending')}
+                                            </span>
+                                        </td>
+                                        <td>{ngo.service_radius_km ? `${ngo.service_radius_km} km` : '—'}</td>
+                                        <td>{ngo.profiles?.phone || '—'}</td>
+                                        <td className="admin-log-timestamp">
+                                            {formatDate(ngo.created_at)}
+                                        </td>
+                                        <td>
+                                            <div className="admin-actions-cell">
+                                                {/* View toggle */}
                                                 <button
-                                                    className="admin-action-btn admin-action-btn--suspend"
-                                                    onClick={() => handleSuspend(ngo.ngo_id)}
-                                                    disabled={actionLoading === ngo.ngo_id}
+                                                    className="admin-action-btn admin-action-btn--view"
+                                                    onClick={() => toggleExpand(ngo.ngo_id)}
+                                                    title="View details"
                                                 >
-                                                    <Ban size={12} strokeWidth={2} style={{ marginRight: 3 }} />
-                                                    {actionLoading === ngo.ngo_id ? t('suspending') : t('suspend')}
+                                                    {expandedId === ngo.ngo_id
+                                                        ? <ChevronUp size={12} strokeWidth={2.5} style={{ marginRight: 3 }} />
+                                                        : <ChevronDown size={12} strokeWidth={2.5} style={{ marginRight: 3 }} />
+                                                    }
+                                                    {expandedId === ngo.ngo_id ? 'Hide' : 'View'}
                                                 </button>
-                                            )}
-                                        </div>
-                                    </td>
-                                </tr>
+
+                                                {!ngo.verification_status && (
+                                                    <>
+                                                        <button
+                                                            className="admin-action-btn admin-action-btn--approve"
+                                                            onClick={() => handleApprove(ngo.ngo_id)}
+                                                            disabled={actionLoading === ngo.ngo_id}
+                                                        >
+                                                            <Check size={12} strokeWidth={2.5} style={{ marginRight: 3 }} />
+                                                            {actionLoading === ngo.ngo_id ? t('approving') : t('approve')}
+                                                        </button>
+                                                        <button
+                                                            className="admin-action-btn admin-action-btn--deny"
+                                                            onClick={() => handleDeny(ngo.ngo_id)}
+                                                            disabled={actionLoading === ngo.ngo_id}
+                                                        >
+                                                            <X size={12} strokeWidth={2.5} style={{ marginRight: 3 }} />
+                                                            {t('deny')}
+                                                        </button>
+                                                    </>
+                                                )}
+                                                {ngo.verification_status && (
+                                                    <button
+                                                        className="admin-action-btn admin-action-btn--suspend"
+                                                        onClick={() => handleSuspend(ngo.ngo_id)}
+                                                        disabled={actionLoading === ngo.ngo_id}
+                                                    >
+                                                        <Ban size={12} strokeWidth={2} style={{ marginRight: 3 }} />
+                                                        {actionLoading === ngo.ngo_id ? t('suspending') : t('suspend')}
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </td>
+                                    </tr>
+
+                                    {/* Expanded detail row */}
+                                    {expandedId === ngo.ngo_id && (
+                                        <tr key={`${ngo.ngo_id}-detail`} className="ngo-detail-row">
+                                            <td colSpan={7} style={{ background: 'rgba(255,255,255,0.03)', padding: '0.75rem 1.25rem' }}>
+                                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '0.6rem 1.5rem', fontSize: '0.78rem' }}>
+                                                    <div>
+                                                        <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Email</span>
+                                                        <span>{ngo.profiles?.email || '—'}</span>
+                                                    </div>
+                                                    <div>
+                                                        <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Contact Person</span>
+                                                        <span>{ngo.contact_person || '—'}</span>
+                                                    </div>
+                                                    <div>
+                                                        <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Address</span>
+                                                        <span>{ngo.address || '—'}</span>
+                                                    </div>
+                                                    <div>
+                                                        <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Coordinates</span>
+                                                        <span style={{ fontFamily: 'monospace', fontSize: '0.7rem' }}>
+                                                            {ngo.latitude && ngo.longitude
+                                                                ? `${parseFloat(ngo.latitude).toFixed(4)}, ${parseFloat(ngo.longitude).toFixed(4)}`
+                                                                : 'Not set'}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    )}
+                                </>
                             ))}
                         </tbody>
                     </table>

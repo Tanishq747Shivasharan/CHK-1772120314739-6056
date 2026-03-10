@@ -136,10 +136,17 @@ export default function AdminDashboard() {
             if (trendRes.status === 'fulfilled') setTrend(trendRes.value?.trend || [])
 
             setActivityFeed(generateActivityFeed(ngosList, donorsList, listingsList))
-            setError(null)
+            
+            const rejected = results.filter(r => r.status === 'rejected')
+            if (rejected.length > 0) {
+                console.warn('Some data streams failed:', rejected)
+                setError(`Warning: ${rejected.length} data streams failed to load. Displaying partial data.`)
+            } else {
+                setError(null)
+            }
         } catch (err) {
             console.error('Admin data fetch error:', err)
-            if (!user) setError('Failed to load dashboard data')
+            setError('Failed to load dashboard data. Retrying may help.')
         } finally {
             if (isInitial) setLoading(false)
         }
@@ -463,7 +470,7 @@ export default function AdminDashboard() {
 
                         {/* 6 — Live Donation Map */}
                         <div id="admin-live-map" className="admin-section">
-                            <MapControl ngos={ngos} donors={donors} listings={listings.filter(l => l.status === 'open')} />
+                            <MapControl ngos={ngos} donors={donors} listings={listings} />
                         </div>
                     </div>
                 </div>
