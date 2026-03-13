@@ -8,6 +8,7 @@ import AcceptedPickups from '../components/AcceptedPickups'
 import VolunteerManager from '../components/VolunteerManager'
 import MapPanel from '../components/MapPanel'
 import ActivityLog from '../components/ActivityLog'
+import FoodRequest from '../components/FoodRequest'
 import NotificationToast from '../components/NotificationToast'
 import { useSocket } from '../../../context/SocketContext'
 import { Bell, X } from 'lucide-react'
@@ -33,6 +34,7 @@ function DashboardInner() {
         volunteers: t('ngo.volunteerManagement'),
         map: t('ngo.operationsMap'),
         log: t('ngo.activityLog'),
+        'food-request': t('ngo.foodRequest', 'Targeted Food Request'),
     }
 
     const VIEW_SUBTITLES = {
@@ -42,6 +44,7 @@ function DashboardInner() {
         volunteers: t('ngo.addEditManageVolunteers'),
         map: t('ngo.liveMapShowingDonations'),
         log: t('ngo.sessionActivityHistory'),
+        'food-request': t('ngo.searchDonorInventory', 'Search donor inventory and request specific items'),
     }
 
     /* Cinematic page load */
@@ -167,6 +170,8 @@ function DashboardInner() {
                 return <MapPanel />
             case 'log':
                 return <ActivityLog />
+            case 'food-request':
+                return <FoodRequest />
             default:
                 return <OverviewCards />
         }

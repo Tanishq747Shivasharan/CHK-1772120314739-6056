@@ -303,6 +303,58 @@ router.get('/my', authenticateUser, donorOnly, async (req, res) => {
   }
 });
 
+router.get('/search', authenticateUser, async (req, res) => {
+  try {
+    const { q } = req.query;
+
+    if (!q) {
+      return res.status(400).json({
+        error: 'Missing search query',
+        message: 'Please provide a search term (e.g., ?q=Rice)'
+      });
+    }
+
+    const { data: listings, error } = await supabaseAdmin
+      .from('food_listings')
+      .select(`
+        *,
+        donors!inner (
+          donor_id,
+          city,
+          address,
+          profiles!inner (
+            organization_name,
+            full_name
+          )
+        )
+      `)
+      .eq('status', 'open')
+      .gt('expiry_time', new Date().toISOString())
+      .ilike('food_type', `%${q}%`)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Listings search error:', error);
+      return res.status(500).json({
+        error: 'Failed to search listings',
+        message: error.message
+      });
+    }
+
+    res.json({
+      listings: listings || [],
+      count: (listings || []).length
+    });
+
+  } catch (error) {
+    console.error('Search listings error:', error);
+    res.status(500).json({
+      error: 'Failed to search listings',
+      message: error.message
+    });
+  }
+});
+
 router.get('/:listing_id', async (req, res) => {
   try {
     const { listing_id } = req.params;

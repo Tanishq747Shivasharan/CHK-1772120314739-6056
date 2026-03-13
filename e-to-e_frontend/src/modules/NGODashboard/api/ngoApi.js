@@ -52,6 +52,8 @@ export const getAvailableListings = () => apiFetch('/listings')
 
 export const getListingById = (listingId) => apiFetch(`/listings/${listingId}`)
 
+export const searchListings = (query) => apiFetch(`/listings/search?q=${encodeURIComponent(query)}`)
+
 /* ─── Claims ─── */
 export const claimListing = ({ listing_id, pickup_scheduled_time, strategy_notes }) =>
     apiFetch('/claims', {

@@ -23,6 +23,7 @@ export function NGOProvider({ children }) {
 
     const [notifications, setNotifications] = useState([])
     const [activityLog, setActivityLog] = useState([])
+    const [searchResults, setSearchResults] = useState([])
 
     const [loading, setLoading] = useState({
         initial: true,
@@ -31,6 +32,7 @@ export function NGOProvider({ children }) {
         volunteers: false,
         deliveries: false,
         action: false,
+        search: false,
     })
 
     const [errors, setErrors] = useState({})
@@ -158,6 +160,25 @@ export function NGOProvider({ children }) {
     }, [fetchListings, fetchClaims, fetchVolunteers, fetchDeliveries, fetchImpact])
 
     /* ─── Actions ─── */
+    const searchFoodInventory = useCallback(async (query) => {
+        setLoading((l) => ({ ...l, search: true }))
+        try {
+            if (!query || query.trim() === '') {
+                setSearchResults([])
+                return []
+            }
+            const data = await api.searchListings(query)
+            setSearchResults(data.listings || [])
+            return data.listings || []
+        } catch (err) {
+            addNotification('error', err.message || 'Failed to search inventory')
+            setSearchResults([])
+            throw err
+        } finally {
+            setLoading((l) => ({ ...l, search: false }))
+        }
+    }, [addNotification])
+
     const handleClaimListing = useCallback(
         async (listingId, pickupTime, notes) => {
             setLoading((l) => ({ ...l, action: true }))
@@ -423,6 +444,7 @@ export function NGOProvider({ children }) {
         stats,
         notifications,
         activityLog,
+        searchResults,
         loading,
         errors,
 
@@ -434,6 +456,7 @@ export function NGOProvider({ children }) {
         fetchDeliveries,
 
         // Actions
+        searchFoodInventory,
         handleClaimListing,
         handleAddVolunteer,
         handleUpdateVolunteer,
