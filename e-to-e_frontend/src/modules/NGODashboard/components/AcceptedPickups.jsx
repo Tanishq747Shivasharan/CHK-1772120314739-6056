@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNGO } from '../context/NGOContext'
 import { animateRowsStagger, animateButtonPress, playSuccessRing, flashRow } from '../animations/ngoAnimations'
+import { getDonorDisplayName } from '../../../lib/donorIdentity'
 
 export default function AcceptedPickups() {
     const { t } = useTranslation('dashboard')
@@ -160,7 +161,7 @@ export default function AcceptedPickups() {
                     {claims.map((claim) => {
                         const delivery = getDeliveryForClaim(claim.claim_id)
                         const listing = claim.food_listings || {}
-                        const donorName = listing.donors?.profiles?.organization_name || '—'
+                        const donorName = getDonorDisplayName(listing)
                         const donorPhone = listing.donors?.profiles?.phone || '—'
                         const volunteerName = delivery?.volunteers?.full_name || null
 

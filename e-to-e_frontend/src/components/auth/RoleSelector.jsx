@@ -1,6 +1,6 @@
 /**
  * RoleSelector — Button-group behaving like radio buttons for role selection.
- * Three roles: Admin, NGO, Donor
+ * Roles: Donor, NGO, Volunteer, Admin
  */
 
 const ROLES = [
@@ -24,6 +24,17 @@ const ROLES = [
             </svg>
         ),
         desc: 'Redistribute to communities',
+    },
+    {
+        value: 'volunteer',
+        label: 'Volunteer',
+        icon: (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="9" cy="8" r="3.5" />
+                <path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 5.5a3 3 0 0 1 0 5.8M18 14a5 5 0 0 1 3.5 4.8" />
+            </svg>
+        ),
+        desc: 'Collect approved donations',
     },
     {
         value: 'admin',

@@ -14,11 +14,12 @@ import { useSocket } from '../../../context/SocketContext'
 import { Bell, X } from 'lucide-react'
 import { runPageLoadSequence, animateViewEnter, killAllAnimations } from '../animations/ngoAnimations'
 import { CarbonWallet } from '../../../components/CarbonWallet'
+import { getDonorDisplayName } from '../../../lib/donorIdentity'
 import './NGODashboard.css'
 
 function DashboardInner() {
     const { t } = useTranslation('dashboard')
-    const { loading, errors, ngoProfile, fetchListings, impactSummary } = useNGO()
+    const { loading, errors, fetchListings, impactSummary } = useNGO()
     const socket = useSocket()
     const [activeView, setActiveView] = useState('overview')
     const [collapsed, setCollapsed] = useState(false)
@@ -222,7 +223,7 @@ function DashboardInner() {
                                                     <div className="ngo-notification-item__content">
                                                         <p dangerouslySetInnerHTML={{
                                                             __html: t('ngo.userDonatedFood', {
-                                                                donorName: alert.donor_name,
+                                                                donorName: getDonorDisplayName(alert, t('ngo.unknownDonor')),
                                                                 quantity: alert.quantity_kg,
                                                                 foodType: alert.food_type
                                                             })

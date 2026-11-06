@@ -2,6 +2,7 @@ import { useEffect, useRef, useMemo, useState } from 'react'
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import { useNGO } from '../context/NGOContext'
+import { getDonorDisplayName } from '../../../lib/donorIdentity'
 import 'leaflet/dist/leaflet.css'
 
 /* ─── Custom Marker Icons ─── */
@@ -64,7 +65,7 @@ export default function MapPanel() {
                 id: l.listing_id,
                 lat,
                 lng,
-                name: l.donor_name || 'Donor',
+                name: getDonorDisplayName(l, 'Donor'),
                 food: l.food_type || '',
                 qty: l.quantity_kg || '',
                 address: l.pickup_address || '',
@@ -90,7 +91,7 @@ export default function MapPanel() {
                 id: fl.listing_id || claim.claim_id,
                 lat: parseFloat(fl.latitude),
                 lng: parseFloat(fl.longitude),
-                name: fl.donors?.organization_name || fl.donors?.city || 'Donor',
+                name: getDonorDisplayName(fl, fl.donors?.city ? `Donor (${fl.donors.city})` : 'Donor'),
                 food: fl.food_type || '',
                 qty: fl.quantity_kg || '',
                 address: fl.pickup_address || '',

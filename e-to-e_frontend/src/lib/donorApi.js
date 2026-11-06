@@ -66,6 +66,14 @@ export async function getMyListings() {
     return apiFetch('/listings/my')
 }
 
+export async function getMyDonorDeliveries() {
+    return apiFetch('/deliveries/donor/my')
+}
+
+export async function resendPickupCode(deliveryId) {
+    return apiFetch(`/deliveries/${deliveryId}/resend-code`, { method: 'POST' })
+}
+
 export async function getListingById(listingId) {
     return apiFetch(`/listings/${listingId}`)
 }

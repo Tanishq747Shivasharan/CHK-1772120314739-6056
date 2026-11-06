@@ -257,7 +257,7 @@ router.get('/', authenticateUser, async (req, res) => {
 
 router.post('/me/volunteers', authenticateUser, ngoOnly, async (req, res) => {
   try {
-    const { full_name, phone, vehicle_type } = req.body;
+    const { full_name, phone, vehicle_type, account_email } = req.body;
 
     if (!full_name || !phone) {
       return res.status(400).json({
@@ -278,12 +278,29 @@ router.post('/me/volunteers', authenticateUser, ngoOnly, async (req, res) => {
       });
     }
 
+    let volunteerProfileId = null;
+    if (account_email) {
+      const { data: volunteerProfile, error: profileError } = await supabaseAdmin
+        .from('profiles')
+        .select('id, role')
+        .eq('email', String(account_email).trim().toLowerCase())
+        .maybeSingle();
+      if (profileError || !volunteerProfile || volunteerProfile.role !== 'volunteer') {
+        return res.status(400).json({
+          error: 'Volunteer account not found',
+          message: 'Use the email address of an existing volunteer account.'
+        });
+      }
+      volunteerProfileId = volunteerProfile.id;
+    }
+
     const { data: volunteer, error } = await supabaseAdmin
       .from('volunteers')
       .insert({
         ngo_id: ngo.ngo_id,
         full_name,
         phone,
+        profile_id: volunteerProfileId,
         vehicle_type: vehicle_type || null,
         availability_status: true
       })
@@ -291,9 +308,9 @@ router.post('/me/volunteers', authenticateUser, ngoOnly, async (req, res) => {
       .single();
 
     if (error) {
-      return res.status(500).json({
+      return res.status(error.code === '23505' ? 409 : 500).json({
         error: 'Failed to add volunteer',
-        message: error.message
+        message: error.code === '23505' ? 'This volunteer account is already linked to another volunteer record.' : error.message
       });
     }
 
@@ -327,7 +344,7 @@ router.get('/me/volunteers', authenticateUser, ngoOnly, async (req, res) => {
 
     const { data: volunteers, error } = await supabaseAdmin
       .from('volunteers')
-      .select('*')
+      .select('*, profiles(email)')
       .eq('ngo_id', ngo.ngo_id)
       .order('created_at', { ascending: false });
 
@@ -355,7 +372,7 @@ router.get('/me/volunteers', authenticateUser, ngoOnly, async (req, res) => {
 router.put('/me/volunteers/:volunteer_id', authenticateUser, ngoOnly, async (req, res) => {
   try {
     const { volunteer_id } = req.params;
-    const { full_name, phone, vehicle_type, availability_status } = req.body;
+    const { full_name, phone, vehicle_type, availability_status, account_email } = req.body;
 
     const { data: ngo } = await supabaseAdmin
       .from('ngos')
@@ -369,11 +386,32 @@ router.put('/me/volunteers/:volunteer_id', authenticateUser, ngoOnly, async (req
       });
     }
 
+    let volunteerProfileId;
+    if (account_email !== undefined) {
+      if (!String(account_email).trim()) {
+        volunteerProfileId = null;
+      } else {
+        const { data: volunteerProfile, error: profileError } = await supabaseAdmin
+          .from('profiles')
+          .select('id, role')
+          .eq('email', String(account_email).trim().toLowerCase())
+          .maybeSingle();
+        if (profileError || !volunteerProfile || volunteerProfile.role !== 'volunteer') {
+          return res.status(400).json({
+            error: 'Volunteer account not found',
+            message: 'Use the email address of an existing volunteer account.'
+          });
+        }
+        volunteerProfileId = volunteerProfile.id;
+      }
+    }
+
     const updates = {};
     if (full_name !== undefined) updates.full_name = full_name;
     if (phone !== undefined) updates.phone = phone;
     if (vehicle_type !== undefined) updates.vehicle_type = vehicle_type;
     if (availability_status !== undefined) updates.availability_status = availability_status;
+    if (volunteerProfileId !== undefined) updates.profile_id = volunteerProfileId;
 
     const { data: volunteer, error } = await supabaseAdmin
       .from('volunteers')
@@ -384,9 +422,9 @@ router.put('/me/volunteers/:volunteer_id', authenticateUser, ngoOnly, async (req
       .single();
 
     if (error) {
-      return res.status(500).json({
+      return res.status(error.code === '23505' ? 409 : 500).json({
         error: 'Failed to update volunteer',
-        message: error.message
+        message: error.code === '23505' ? 'This volunteer account is already linked to another volunteer record.' : error.message
       });
     }
 

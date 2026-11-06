@@ -19,6 +19,7 @@ import {
     getDonorProfile,
     updateDonorProfile,
     getMyListings,
+    getMyDonorDeliveries,
     getDonorImpact,
     getImpactSummary,
 } from '../../lib/donorApi'
@@ -31,6 +32,7 @@ export default function DonorDashboard() {
     const [user, setUser] = useState(null)
     const [donorProfile, setDonorProfile] = useState(null)
     const [listings, setListings] = useState([])
+    const [deliveries, setDeliveries] = useState([])
     const [impact, setImpact] = useState(null)
     const [impactSummary, setImpactSummary] = useState(null)
     const [activeView, setActiveView] = useState('overview')
@@ -46,10 +48,11 @@ export default function DonorDashboard() {
     /* ── Fetch all data ── */
     const fetchDashboardData = useCallback(async () => {
         try {
-            const [userRes, donorRes, listingsRes, impactRes, impactSummRes] = await Promise.allSettled([
+            const [userRes, donorRes, listingsRes, deliveriesRes, impactRes, impactSummRes] = await Promise.allSettled([
                 getCurrentUser(),
                 getDonorProfile(),
                 getMyListings(),
+                getMyDonorDeliveries(),
                 getDonorImpact(),
                 getImpactSummary(),
             ])
@@ -57,6 +60,7 @@ export default function DonorDashboard() {
             if (userRes.status === 'fulfilled') setUser(userRes.value.user)
             if (donorRes.status === 'fulfilled') setDonorProfile(donorRes.value.donor)
             if (listingsRes.status === 'fulfilled') setListings(listingsRes.value.listings || [])
+            if (deliveriesRes.status === 'fulfilled') setDeliveries(deliveriesRes.value.deliveries || [])
             if (impactRes.status === 'fulfilled') setImpact(impactRes.value.impact)
             if (impactSummRes.status === 'fulfilled') setImpactSummary(impactSummRes.value)
 
@@ -75,6 +79,8 @@ export default function DonorDashboard() {
             if (userRes.status === 'rejected') newErrors.user = friendlyError(userRes.reason)
             if (listingsRes.status === 'rejected')
                 newErrors.listings = friendlyError(listingsRes.reason)
+            if (deliveriesRes.status === 'rejected')
+                newErrors.tracking = friendlyError(deliveriesRes.reason)
             setErrors(newErrors)
         } catch (err) {
             console.error('Dashboard data fetch error:', err)
@@ -94,9 +100,10 @@ export default function DonorDashboard() {
 
         // Polling for active status updates (every 30s)
         pollingRef.current = setInterval(() => {
-            getMyListings()
-                .then((res) => setListings(res.listings || []))
-                .catch(() => { })
+            Promise.allSettled([getMyListings(), getMyDonorDeliveries()]).then(([listingRes, deliveryRes]) => {
+                if (listingRes.status === 'fulfilled') setListings(listingRes.value.listings || [])
+                if (deliveryRes.status === 'fulfilled') setDeliveries(deliveryRes.value.deliveries || [])
+            })
         }, 30000)
 
         return () => {
@@ -255,7 +262,7 @@ export default function DonorDashboard() {
                                     </div>
                                     <TrackingMap
                                         listings={activeListings}
-                                        donorProfile={donorProfile}
+                                        deliveries={deliveries}
                                     />
                                 </div>
                             </div>
@@ -293,12 +300,11 @@ export default function DonorDashboard() {
                     {activeView === 'tracking' && (
                         <div className="dd-view-page">
                             <p className="dd-view-subtitle">
-                                Monitor your active donations in real time. Pickup locations and
-                                NGO markers are displayed live.
+                                Follow the assigned volunteer to your pickup, see the road route and ETA, and verify collection using the code sent to your registered email.
                             </p>
                             <TrackingMap
                                 listings={activeListings}
-                                donorProfile={donorProfile}
+                                deliveries={deliveries}
                             />
                         </div>
                     )}

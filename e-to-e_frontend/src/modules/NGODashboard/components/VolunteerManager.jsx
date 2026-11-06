@@ -10,6 +10,7 @@ const INITIAL_FORM = {
     full_name: '',
     phone: '',
     vehicle_type: '',
+    account_email: '',
 }
 
 export default function VolunteerManager() {
@@ -66,6 +67,7 @@ export default function VolunteerManager() {
                         full_name: form.full_name,
                         phone: form.phone,
                         vehicle_type: form.vehicle_type || null,
+                        account_email: form.account_email,
                     })
                     setEditingId(null)
                 } else {
@@ -73,6 +75,7 @@ export default function VolunteerManager() {
                         full_name: form.full_name,
                         phone: form.phone,
                         vehicle_type: form.vehicle_type || null,
+                        account_email: form.account_email,
                     })
                 }
                 setForm(INITIAL_FORM)
@@ -89,6 +92,7 @@ export default function VolunteerManager() {
             full_name: vol.full_name,
             phone: vol.phone,
             vehicle_type: vol.vehicle_type || '',
+            account_email: vol.profiles?.email || '',
         })
     }
 
@@ -172,6 +176,19 @@ export default function VolunteerManager() {
                                 </option>
                             ))}
                         </select>
+                    </div>
+                    <div className="ngo-form-group">
+                        <label htmlFor="vol-account-email">Volunteer app account email (optional)</label>
+                        <input
+                            id="vol-account-email"
+                            name="account_email"
+                            type="email"
+                            className="ngo-input"
+                            value={form.account_email}
+                            onChange={handleFormChange}
+                            placeholder="volunteer@example.com"
+                            autoComplete="email"
+                        />
                     </div>
                 </div>
                 {formError && <p className="ngo-form-error">{formError}</p>}

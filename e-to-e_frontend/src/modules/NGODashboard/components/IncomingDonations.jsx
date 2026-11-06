@@ -2,6 +2,7 @@ import { useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNGO } from '../context/NGOContext'
 import { animateRowsStagger, animateButtonPress } from '../animations/ngoAnimations'
+import { getDonorDisplayName } from '../../../lib/donorIdentity'
 
 export default function IncomingDonations() {
     const { t } = useTranslation('dashboard')
@@ -48,9 +49,8 @@ export default function IncomingDonations() {
 
     /* Extract donor info — geo-matched listings may have flat fields or nested donors */
     function getDonorName(listing) {
-        if (listing.organization_name) return listing.organization_name
-        if (listing.donors?.organization_name) return listing.donors.organization_name
-        if (listing.donor_name) return listing.donor_name
+        const name = getDonorDisplayName(listing, '')
+        if (name) return name
         if (listing.donors?.city) return `${t('ngo.donor')} (${listing.donors.city})`
         return t('ngo.unknownDonor')
     }

@@ -1,0 +1,36 @@
+CREATE TABLE impact_wallets (
+    wallet_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+    profile_id UUID NOT NULL
+        REFERENCES profiles(id)
+        ON DELETE CASCADE,
+
+    role TEXT NOT NULL
+        CHECK (role IN ('donor', 'ngo', 'admin', 'platform')),
+
+    impact_points_balance DECIMAL(10,2) DEFAULT 0,
+    lifetime_impact_points DECIMAL(12,2) DEFAULT 0,
+
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+
+    UNIQUE (profile_id, role)
+);
+
+CREATE TABLE carbon_credits (
+    credit_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+    owner_profile_id UUID NOT NULL
+        REFERENCES profiles(id)
+        ON DELETE CASCADE,
+
+    issued_by_admin UUID NOT NULL
+        REFERENCES profiles(id),
+
+    source_impact_points INTEGER NOT NULL
+        CHECK (source_impact_points = 100),
+
+    issued_at TIMESTAMPTZ DEFAULT NOW(),
+
+    metadata JSONB
+);

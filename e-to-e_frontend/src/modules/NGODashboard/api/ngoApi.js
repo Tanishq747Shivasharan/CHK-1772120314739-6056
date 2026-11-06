@@ -81,10 +81,10 @@ export const cancelClaim = (claimId) =>
 // DB schema: volunteer_id, ngo_id, full_name, phone, availability_status, vehicle_type
 export const getVolunteers = () => apiFetch('/ngos/me/volunteers')
 
-export const addVolunteer = ({ full_name, phone, vehicle_type }) =>
+export const addVolunteer = ({ full_name, phone, vehicle_type, account_email }) =>
     apiFetch('/ngos/me/volunteers', {
         method: 'POST',
-        body: JSON.stringify({ full_name, phone, vehicle_type }),
+        body: JSON.stringify({ full_name, phone, vehicle_type, account_email }),
     })
 
 export const updateVolunteer = (volunteerId, updates) =>

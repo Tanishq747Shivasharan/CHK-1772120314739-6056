@@ -189,7 +189,7 @@ export function AuthProvider({ children }) {
             donor: '/donor-dashboard',
             ngo: '/ngo-dashboard',
             admin: '/admin-dashboard',
-            volunteer: '/ngo-dashboard',
+            volunteer: '/volunteer-dashboard',
         }
         return roleToPath[role] || '/login'
     }, [])

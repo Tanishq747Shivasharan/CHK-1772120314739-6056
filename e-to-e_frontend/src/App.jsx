@@ -11,12 +11,13 @@ import ContactPage from './pages/ContactPage'
 import DonorDashboard from './DonorDashboard/pages/DonorDashboard'
 import NGODashboard from './modules/NGODashboard/pages/NGODashboard'
 import AdminDashboard from './admin/AdminDashboard'
+import VolunteerDashboard from './VolunteerDashboard/VolunteerDashboard'
 import ProtectedRoute from './components/ProtectedRoute'
 import CinematicPreloader from './components/CinematicPreloader'
 
 gsap.registerPlugin(ScrollTrigger)
 
-const DASHBOARD_PREFIXES = ['/donor-dashboard', '/ngo-dashboard', '/admin-dashboard']
+const DASHBOARD_PREFIXES = ['/donor-dashboard', '/ngo-dashboard', '/admin-dashboard', '/volunteer-dashboard']
 
 import { useAuth } from './context/AuthContext'
 import { SocketProvider } from './context/SocketContext'
@@ -115,6 +116,14 @@ function App() {
               element={
                 <ProtectedRoute allowedRoles={['admin']}>
                   <AdminDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/volunteer-dashboard"
+              element={
+                <ProtectedRoute allowedRoles={['volunteer']}>
+                  <VolunteerDashboard />
                 </ProtectedRoute>
               }
             />

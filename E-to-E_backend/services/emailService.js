@@ -207,6 +207,27 @@ const sendDeliveryCompletedEmail = async ({
   });
 };
 
+const sendCollectionOtpEmail = async ({ to, code, donorName, foodType, ngoName, expiresInMinutes = 10 }) => {
+  const escapeHtml = (value) => String(value || '').replace(/[&<>"']/g, (character) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  })[character]);
+
+  return sendEmail({
+    to,
+    subject: `Pickup verification code for ${foodType || 'your donation'}`,
+    html: `
+      <div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;color:#443c3c">
+        <h2>Confirm your food donation pickup</h2>
+        <p>Hello ${escapeHtml(donorName || 'Donor')},</p>
+        <p>${escapeHtml(ngoName || 'Your NGO')} has a volunteer on the way to collect <strong>${escapeHtml(foodType || 'your donation')}</strong>.</p>
+        <p>Share this code with the volunteer only when they arrive at the pickup location:</p>
+        <p style="font-size:32px;font-weight:700;letter-spacing:8px;background:#f5f2f1;padding:18px;text-align:center;border-radius:12px">${escapeHtml(code)}</p>
+        <p>This code expires in ${Number(expiresInMinutes)} minutes. Extra-to-Essential will never ask you to share it before pickup.</p>
+      </div>
+    `
+  });
+};
+
 module.exports = {
   sendEmail,
   loadTemplate,
@@ -216,4 +237,5 @@ module.exports = {
   sendClaimAcceptedEmail,
   sendDeliveryAssignedEmail,
   sendDeliveryCompletedEmail,
+  sendCollectionOtpEmail,
 };

@@ -1,0 +1,21 @@
+SELECT listing_id, food_type, status, is_locked, created_at
+FROM food_listings
+WHERE is_locked = true
+ORDER BY created_at DESC;
+
+-- Unlock all locked listings
+UPDATE food_listings
+SET is_locked = false,
+    status = 'open',
+    updated_at = NOW()
+WHERE is_locked = true
+  AND status NOT IN ('completed', 'expired');
+
+-- Delete incomplete claims
+DELETE FROM ngo_claims
+WHERE claim_id IN (
+    SELECT nc.claim_id
+    FROM ngo_claims nc
+    LEFT JOIN deliveries d ON d.claim_id = nc.claim_id
+    WHERE d.delivery_id IS NULL
+);

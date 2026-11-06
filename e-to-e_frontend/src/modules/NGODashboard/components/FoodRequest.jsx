@@ -1,7 +1,8 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNGO } from '../context/NGOContext'
 import { Search, UserCircle, MapPin, Clock, Leaf, CheckCircle } from 'lucide-react'
+import { getDonorDisplayName } from '../../../lib/donorIdentity'
 
 export default function FoodRequest() {
     const { t } = useTranslation('dashboard')
@@ -45,11 +46,8 @@ export default function FoodRequest() {
     )
 
     function getDonorName(listing) {
-        if (listing.donors?.profiles?.organization_name) return listing.donors.profiles.organization_name
-        if (listing.donors?.profiles?.full_name) return listing.donors.profiles.full_name
-        if (listing.organization_name) return listing.organization_name
-        if (listing.donors?.organization_name) return listing.donors.organization_name
-        if (listing.donor_name) return listing.donor_name
+        const name = getDonorDisplayName(listing, '')
+        if (name) return name
         if (listing.donors?.city) return `${t('ngo.donor')} (${listing.donors.city})`
         return t('ngo.unknownDonor')
     }

@@ -3,9 +3,28 @@ const router = express.Router();
 const { supabaseAdmin } = require('../config/supabaseClient');
 const { authenticateUser } = require('../middleware/authMiddleware');
 const { ngoOnly } = require('../middleware/roleGuards');
-const { sendClaimAlert, sendDeliveryAlert } = require('../services/notificationService');
-const { findBestVolunteer } = require('../services/volunteerService');
-const { sendClaimAcceptedEmail, sendDeliveryAssignedEmail } = require('../services/emailService');
+const { sendClaimAlert } = require('../services/notificationService');
+const { sendClaimAcceptedEmail } = require('../services/emailService');
+
+async function createUnassignedDelivery(claimId) {
+  const { data: existing } = await supabaseAdmin
+    .from('deliveries')
+    .select('*')
+    .eq('claim_id', claimId)
+    .maybeSingle();
+  if (existing) return existing;
+
+  const { data: delivery, error } = await supabaseAdmin
+    .from('deliveries')
+    .insert({ claim_id: claimId, volunteer_id: null, delivery_status: 'assigned' })
+    .select()
+    .single();
+  if (error) {
+    console.error('[CLAIMS] Failed to open volunteer pickup:', error.message);
+    return null;
+  }
+  return delivery;
+}
 
 router.post('/', authenticateUser, ngoOnly, async (req, res) => {
   try {
@@ -102,34 +121,12 @@ router.post('/', authenticateUser, ngoOnly, async (req, res) => {
         }
       })();
 
-      let assignedDelivery = null;
-      try {
-        const bestVolunteer = await findBestVolunteer(ngo.ngo_id);
-        if (bestVolunteer) {
-          console.log('[CLAIMS] Auto-assigning volunteer:', bestVolunteer.full_name);
-          const { data: delivery, error: delErr } = await supabaseAdmin
-            .from('deliveries')
-            .insert({
-              claim_id: rpcResult.claim_id,
-              volunteer_id: bestVolunteer.volunteer_id,
-              delivery_status: 'assigned'
-            })
-            .select()
-            .single();
-
-          if (!delErr && delivery) {
-            assignedDelivery = { ...delivery, volunteer: bestVolunteer };
-            sendDeliveryAlert(ngo.phone || 'NGO_ADMIN', bestVolunteer.full_name, 'assigned').catch(() => { });
-          }
-        }
-      } catch (volErr) {
-        console.error('[CLAIMS] Auto-assignment failed:', volErr);
-      }
+      const delivery = await createUnassignedDelivery(rpcResult.claim_id);
 
       return res.status(201).json({
         message: 'Listing claimed successfully',
         claim: rpcResult,
-        delivery: assignedDelivery
+        delivery
       });
     }
 
@@ -210,34 +207,12 @@ router.post('/', authenticateUser, ngoOnly, async (req, res) => {
       }
     })();
 
-    let assignedDelivery = null;
-    try {
-      const bestVolunteer = await findBestVolunteer(ngo.ngo_id);
-      if (bestVolunteer) {
-        console.log('[CLAIMS] Auto-assigning volunteer (fallback):', bestVolunteer.full_name);
-        const { data: delivery, error: delErr } = await supabaseAdmin
-          .from('deliveries')
-          .insert({
-            claim_id: claim.claim_id,
-            volunteer_id: bestVolunteer.volunteer_id,
-            delivery_status: 'assigned'
-          })
-          .select()
-          .single();
-
-        if (!delErr && delivery) {
-          assignedDelivery = { ...delivery, volunteer: bestVolunteer };
-          sendDeliveryAlert(ngo.phone || 'NGO_ADMIN', bestVolunteer.full_name, 'assigned').catch(() => { });
-        }
-      }
-    } catch (volErr) {
-      console.error('[CLAIMS] Auto-assignment failed (fallback):', volErr);
-    }
+    const delivery = await createUnassignedDelivery(claim.claim_id);
 
     return res.status(201).json({
       message: 'Listing claimed successfully',
       claim,
-      delivery: assignedDelivery
+      delivery
     });
 
   } catch (error) {
@@ -271,6 +246,7 @@ router.get('/my', authenticateUser, ngoOnly, async (req, res) => {
           donors (
             profiles (
               organization_name,
+              full_name,
               phone
             )
           )

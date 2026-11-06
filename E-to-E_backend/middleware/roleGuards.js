@@ -52,6 +52,24 @@ const adminOnly = (req, res, next) => {
   next();
 };
 
+const volunteerOnly = (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({
+      error: 'Unauthorized',
+      message: 'Authentication required'
+    });
+  }
+
+  if (req.user.role !== 'volunteer') {
+    return res.status(403).json({
+      error: 'Forbidden',
+      message: 'Volunteer access required'
+    });
+  }
+
+  next();
+};
+
 const requireRole = (...allowedRoles) => {
   return (req, res, next) => {
     if (!req.user) {
@@ -123,6 +141,7 @@ module.exports = {
   donorOnly,
   ngoOnly,
   adminOnly,
+  volunteerOnly,
   requireRole,
   ownsResource
 };
