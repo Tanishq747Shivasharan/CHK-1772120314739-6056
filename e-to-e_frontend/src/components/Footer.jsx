@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { gsap } from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import './Footer.css'
+import { shouldSimplifyMotion } from '../lib/motionPreferences'
 
 gsap.registerPlugin(ScrollTrigger)
 
@@ -12,6 +13,8 @@ const Footer = () => {
     const footerRef = useRef(null)
 
     useEffect(() => {
+        if (shouldSimplifyMotion()) return undefined
+
         const ctx = gsap.context(() => {
             gsap.from('.footer__inner > *', {
                 y: 30,
@@ -25,6 +28,20 @@ const Footer = () => {
                     toggleActions: 'play none none reverse',
                 },
             })
+
+            gsap.fromTo('.footer__divider',
+                { scaleX: 0, transformOrigin: 'center center' },
+                {
+                    scaleX: 1,
+                    ease: 'none',
+                    scrollTrigger: {
+                        trigger: footerRef.current,
+                        start: 'top 88%',
+                        end: 'top 38%',
+                        scrub: 0.8,
+                    },
+                }
+            )
         }, footerRef)
 
         return () => ctx.revert()

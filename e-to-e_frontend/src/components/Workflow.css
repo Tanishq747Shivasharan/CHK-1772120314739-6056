@@ -60,6 +60,14 @@
     border-color: var(--swiss-coffee);
 }
 
+.workflow__step.is-active .workflow__step-icon::after {
+    border-color: var(--tundora);
+}
+
+.workflow__step.is-active .workflow__step-label {
+    color: var(--tundora);
+}
+
 .workflow__step-label {
     font-family: var(--font-serif);
     font-size: 1rem;

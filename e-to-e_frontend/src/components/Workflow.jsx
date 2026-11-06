@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { gsap } from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
+import { shouldSimplifyMotion } from '../lib/motionPreferences'
 import './Workflow.css'
 
 gsap.registerPlugin(ScrollTrigger)
@@ -74,6 +75,10 @@ const Workflow = () => {
     const linesRef = useRef([])
 
     useEffect(() => {
+        if (shouldSimplifyMotion()) return undefined
+
+        const mountedSteps = stepsRef.current
+        const mountedConnectors = linesRef.current
         const ctx = gsap.context(() => {
             // Title animation
             gsap.from('.workflow__label, .workflow__title, .workflow__subtitle', {
@@ -90,7 +95,8 @@ const Workflow = () => {
             })
 
             // Steps from left with stagger
-            stepsRef.current.forEach((step, i) => {
+            mountedSteps.forEach((step, i) => {
+                if (!step) return
                 gsap.from(step, {
                     y: 50,
                     opacity: 0,
@@ -105,26 +111,58 @@ const Workflow = () => {
                 })
             })
 
-            // Connecting lines draw animation
-            linesRef.current.forEach((line, i) => {
-                if (line) {
-                    gsap.from(line, {
-                        scaleX: 0,
-                        transformOrigin: 'left center',
-                        duration: 0.6,
-                        delay: i * 0.15 + 0.3,
-                        ease: 'power2.inOut',
-                        scrollTrigger: {
-                            trigger: sectionRef.current,
-                            start: 'top 55%',
-                            toggleActions: 'play none none reverse',
-                        },
-                    })
+            const progress = gsap.timeline({
+                scrollTrigger: {
+                    trigger: sectionRef.current,
+                    start: 'top 72%',
+                    end: 'bottom 32%',
+                    scrub: 0.8,
+                },
+            })
+
+            mountedSteps.forEach((step, i) => {
+                if (!step) return
+                const icon = step.querySelector('.workflow__step-icon')
+                const position = i * 0.24
+                if (icon) {
+                    progress.to(icon, {
+                        scale: 1.08,
+                        backgroundColor: '#443c3c',
+                        color: '#ffffff',
+                        duration: 0.12,
+                        ease: 'none',
+                    }, position)
+                    progress.to(icon, {
+                        scale: 1,
+                        backgroundColor: '#d4ccca',
+                        color: '#443c3c',
+                        duration: 0.12,
+                        ease: 'none',
+                    }, position + 0.12)
+                }
+                const connector = mountedConnectors[i]
+                if (connector) {
+                    progress.fromTo(connector,
+                        { scaleX: 0, transformOrigin: 'left center' },
+                        { scaleX: 1, duration: 0.18, ease: 'none' },
+                        position + 0.12
+                    )
                 }
             })
+
+            const syncActiveStep = () => {
+                const index = Math.min(mountedSteps.length - 1, Math.floor(progress.progress() * mountedSteps.length))
+                mountedSteps.forEach((step, stepIndex) => step?.classList.toggle('is-active', stepIndex === index))
+            }
+            progress.eventCallback('onUpdate', syncActiveStep)
+            progress.eventCallback('onComplete', syncActiveStep)
+            progress.eventCallback('onReverseComplete', syncActiveStep)
         }, sectionRef)
 
-        return () => ctx.revert()
+        return () => {
+            mountedSteps.forEach((step) => step?.classList.remove('is-active'))
+            ctx.revert()
+        }
     }, [])
 
     return (

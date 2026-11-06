@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { gsap } from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import './ImpactSection.css'
+import { shouldSimplifyMotion } from '../lib/motionPreferences'
 
 gsap.registerPlugin(ScrollTrigger)
 
@@ -43,6 +44,8 @@ const ImpactSection = () => {
     const itemsRef = useRef([])
 
     useEffect(() => {
+        if (shouldSimplifyMotion()) return undefined
+
         const ctx = gsap.context(() => {
             gsap.from('.impact__label, .impact__title, .impact__subtitle', {
                 y: 40,
@@ -72,6 +75,37 @@ const ImpactSection = () => {
                         toggleActions: 'play none none reverse',
                     },
                 })
+
+                const imageWrapper = item.querySelector('.impact__image-wrapper')
+                const imageParallax = item.querySelector('.impact__image-parallax')
+                if (imageWrapper && imageParallax) {
+                    gsap.fromTo(imageWrapper,
+                        { clipPath: 'circle(0% at 50% 50%)' },
+                        {
+                            clipPath: 'circle(150% at 50% 50%)',
+                            ease: 'none',
+                            scrollTrigger: {
+                                trigger: item,
+                                start: 'top 86%',
+                                end: 'top 54%',
+                                scrub: 0.65,
+                            },
+                        }
+                    )
+                    gsap.fromTo(imageParallax,
+                        { yPercent: -8 },
+                        {
+                            yPercent: 8,
+                            ease: 'none',
+                            scrollTrigger: {
+                                trigger: item,
+                                start: 'top bottom',
+                                end: 'bottom top',
+                                scrub: 1,
+                            },
+                        }
+                    )
+                }
             })
         }, sectionRef)
 
@@ -97,12 +131,15 @@ const ImpactSection = () => {
                             ref={(el) => (itemsRef.current[i] = el)}
                         >
                             <div className="impact__image-wrapper">
-                                <img
-                                    src={img.src}
-                                    alt={img.alt}
-                                    className="impact__image"
-                                    loading="lazy"
-                                />
+                                <div className="impact__image-parallax">
+                                    <img
+                                        src={img.src}
+                                        alt={img.alt}
+                                        className="impact__image"
+                                        loading="lazy"
+                                        decoding="async"
+                                    />
+                                </div>
                                 <div className="impact__image-overlay">
                                     <span className="impact__image-label">{img.alt}</span>
                                 </div>

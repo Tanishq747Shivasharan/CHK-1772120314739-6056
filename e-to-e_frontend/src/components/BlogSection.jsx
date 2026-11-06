@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { gsap } from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
+import { shouldSimplifyMotion } from '../lib/motionPreferences'
 import './BlogSection.css'
 
 gsap.registerPlugin(ScrollTrigger)
@@ -38,6 +39,8 @@ const BlogSection = () => {
     const cardsRef = useRef([])
 
     useEffect(() => {
+        if (shouldSimplifyMotion()) return undefined
+
         const ctx = gsap.context(() => {
             gsap.from('.blog__label, .blog__title, .blog__subtitle', {
                 y: 40,
@@ -65,6 +68,37 @@ const BlogSection = () => {
                         toggleActions: 'play none none reverse',
                     },
                 })
+
+                const imageWrapper = card.querySelector('.blog-card__image-wrapper')
+                const imageParallax = card.querySelector('.blog-card__image-parallax')
+                if (imageWrapper && imageParallax) {
+                    gsap.fromTo(imageWrapper,
+                        { clipPath: 'circle(0% at 50% 50%)' },
+                        {
+                            clipPath: 'circle(145% at 50% 50%)',
+                            ease: 'none',
+                            scrollTrigger: {
+                                trigger: card,
+                                start: 'top 85%',
+                                end: 'top 52%',
+                                scrub: 0.65,
+                            },
+                        }
+                    )
+                    gsap.fromTo(imageParallax,
+                        { yPercent: -8 },
+                        {
+                            yPercent: 8,
+                            ease: 'none',
+                            scrollTrigger: {
+                                trigger: card,
+                                start: 'top bottom',
+                                end: 'bottom top',
+                                scrub: 1,
+                            },
+                        }
+                    )
+                }
             })
         }, sectionRef)
 
@@ -91,12 +125,15 @@ const BlogSection = () => {
                             id={`blog-${blog.id}`}
                         >
                             <div className="blog-card__image-wrapper">
-                                <img
-                                    src={blog.image}
-                                    alt={blog.title}
-                                    className="blog-card__image"
-                                    loading="lazy"
-                                />
+                                <div className="blog-card__image-parallax">
+                                    <img
+                                        src={blog.image}
+                                        alt={blog.title}
+                                        className="blog-card__image"
+                                        loading="lazy"
+                                        decoding="async"
+                                    />
+                                </div>
                                 <span className="blog-card__tag">{blog.tag}</span>
                             </div>
                             <div className="blog-card__body">

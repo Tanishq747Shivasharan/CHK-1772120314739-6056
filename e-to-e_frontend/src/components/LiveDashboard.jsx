@@ -3,6 +3,7 @@ import { gsap } from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import './LiveDashboard.css'
 import EssenceLine from './EssenceLine'
+import { shouldSimplifyMotion } from '../lib/motionPreferences'
 
 gsap.registerPlugin(ScrollTrigger)
 
@@ -104,6 +105,8 @@ const LiveDashboard = () => {
     }, [])
 
     useEffect(() => {
+        if (shouldSimplifyMotion()) return undefined
+
         const ctx = gsap.context(() => {
             // 1. Essence Line expands
             gsap.fromTo('.dashboard-essence-line',
@@ -119,6 +122,19 @@ const LiveDashboard = () => {
                     }
                 }
             )
+
+            gsap.to('.dashboard__ambient', {
+                xPercent: 10,
+                yPercent: -14,
+                rotation: 5,
+                ease: 'none',
+                scrollTrigger: {
+                    trigger: sectionRef.current,
+                    start: 'top bottom',
+                    end: 'bottom top',
+                    scrub: 1.2,
+                },
+            })
 
             // 2. Text Reveal (Staggered)
             gsap.fromTo('.dashboard__label, .dashboard__title, .dashboard__subtitle',
@@ -190,6 +206,7 @@ const LiveDashboard = () => {
 
     return (
         <section ref={sectionRef} className="dashboard section section--coffee" id="about">
+            <div className="dashboard__ambient" aria-hidden="true" />
             <div className="container">
                 {/* Signature Essence Line */}
                 <EssenceLine className="dashboard-essence-line" width="60px" color="var(--tundora)" delay={0.2} />
@@ -212,7 +229,11 @@ const LiveDashboard = () => {
                         >
                             <div className="stat-card__icon">{card.icon}</div>
                             <div className="stat-card__value">
-                                <span className="stat-card__value-num">0</span>
+                                <span className="stat-card__value-num">
+                                    {card.id === 'co2'
+                                        ? Number(liveStats[card.fallbackKey] || 0).toFixed(2)
+                                        : Math.round(Number(liveStats[card.fallbackKey] || 0)).toLocaleString()}
+                                </span>
                                 <span className="stat-card__value-suffix">{card.suffix}</span>
                             </div>
                             <p className="stat-card__label">{card.label}</p>

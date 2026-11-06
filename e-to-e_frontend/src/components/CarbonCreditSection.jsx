@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { gsap } from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import './CarbonCreditSection.css'
+import { shouldSimplifyMotion } from '../lib/motionPreferences'
 
 gsap.registerPlugin(ScrollTrigger)
 
@@ -39,18 +40,12 @@ const CarbonCreditSection = () => {
     const sectionRef = useRef(null)
     const imageRef = useRef(null)
     const contentRef = useRef(null)
+    const badgeNumberRef = useRef(null)
 
     useEffect(() => {
-        const ctx = gsap.context(() => {
-            // Image floating animation
-            gsap.to(imageRef.current, {
-                y: -15,
-                duration: 3,
-                ease: 'sine.inOut',
-                yoyo: true,
-                repeat: -1,
-            })
+        if (shouldSimplifyMotion()) return undefined
 
+        const ctx = gsap.context(() => {
             // Content reveal
             gsap.from(contentRef.current.children, {
                 y: 50,
@@ -65,16 +60,56 @@ const CarbonCreditSection = () => {
                 },
             })
 
-            // Image reveal
-            gsap.from(imageRef.current, {
-                x: -80,
-                opacity: 0,
-                duration: 1,
-                ease: 'power3.out',
+            // Circular forest reveal and restrained image parallax
+            gsap.fromTo(imageRef.current,
+                { clipPath: 'circle(0% at 50% 50%)', x: -48, autoAlpha: 0 },
+                {
+                    clipPath: 'circle(150% at 50% 50%)',
+                    x: 0,
+                    autoAlpha: 1,
+                    ease: 'none',
+                    scrollTrigger: {
+                        trigger: sectionRef.current,
+                        start: 'top 72%',
+                        end: 'top 38%',
+                        scrub: 0.75,
+                    },
+                }
+            )
+            gsap.to(imageRef.current.querySelector('.carbon__image'), {
+                yPercent: -7,
+                ease: 'none',
                 scrollTrigger: {
                     trigger: sectionRef.current,
-                    start: 'top 70%',
-                    toggleActions: 'play none none reverse',
+                    start: 'top bottom',
+                    end: 'bottom top',
+                    scrub: 1,
+                },
+            })
+
+            gsap.to(imageRef.current.querySelector('.carbon__image-badge'), {
+                y: -18,
+                ease: 'none',
+                scrollTrigger: {
+                    trigger: sectionRef.current,
+                    start: 'top bottom',
+                    end: 'bottom top',
+                    scrub: 1,
+                },
+            })
+
+            const stat = { value: 0 }
+            gsap.to(stat, {
+                value: 8,
+                duration: 1.4,
+                ease: 'power2.out',
+                scrollTrigger: {
+                    trigger: sectionRef.current,
+                    start: 'top 65%',
+                    once: true,
+                },
+                onUpdate: () => {
+                    if (badgeNumberRef.current) badgeNumberRef.current.textContent = String(Math.round(stat.value))
                 },
             })
         }, sectionRef)
@@ -93,9 +128,10 @@ const CarbonCreditSection = () => {
                                 alt="Sustainable forest ecosystem"
                                 className="carbon__image"
                                 loading="lazy"
+                                decoding="async"
                             />
                             <div className="carbon__image-badge">
-                                <span className="carbon__badge-value">8T+</span>
+                                <span className="carbon__badge-value"><span ref={badgeNumberRef}>8</span>T+</span>
                                 <span className="carbon__badge-label">CO₂ Prevented</span>
                             </div>
                         </div>

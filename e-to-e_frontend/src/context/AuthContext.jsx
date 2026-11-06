@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { supabase } from '../lib/supabaseClient'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
 
@@ -176,6 +177,12 @@ export function AuthProvider({ children }) {
         } catch {
             // Ignore logout API errors
         } finally {
+            try {
+                const { error } = await supabase.auth.signOut()
+                if (error) console.error('[AUTH] Supabase sign-out failed:', error.message)
+            } catch (error) {
+                console.error('[AUTH] Supabase sign-out failed:', error.message)
+            }
             clearSession()
             navigate('/login')
         }

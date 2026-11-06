@@ -1,6 +1,6 @@
 /**
  * RoleSelector — Button-group behaving like radio buttons for role selection.
- * Roles: Donor, NGO, Volunteer, Admin
+ * Public registration roles: Donor, NGO, Volunteer
  */
 
 const ROLES = [
@@ -52,7 +52,7 @@ const ROLES = [
 export default function RoleSelector({ value, onChange }) {
     return (
         <div className="auth-role-selector">
-            {ROLES.map((role) => (
+            {ROLES.filter((role) => role.value !== 'admin').map((role) => (
                 <button
                     key={role.value}
                     type="button"

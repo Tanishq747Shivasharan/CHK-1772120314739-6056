@@ -3,21 +3,17 @@ import { Navigate, useNavigate } from 'react-router-dom'
 import { gsap } from 'gsap'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../context/AuthContext'
+import { supabase } from '../lib/supabaseClient'
 import AuthImage from '../components/AuthImage'
 import { LoginForm, RegisterForm } from '../components/AuthPanel'
 import './AuthPage.css'
 
-function AuthPage() {
+function AuthPage({ oauthOnboarding = false }) {
     const { t } = useTranslation('forms')
     const { isAuthenticated, user, loading, getDashboardPath } = useAuth()
     const navigate = useNavigate()
     const [isRegister, setIsRegister] = useState(false)
     const animatingRef = useRef(false)
-
-    // If already logged in, redirect to dashboard
-    if (!loading && isAuthenticated && user) {
-        return <Navigate to={getDashboardPath(user.role)} replace />
-    }
 
     // Refs
     const imagePanelRef = useRef(null)
@@ -266,6 +262,43 @@ function AuthPage() {
             })
         }
     }, [isRegister])
+
+    // If already logged in, redirect to dashboard
+    if (!oauthOnboarding && !loading && isAuthenticated && user) {
+        return <Navigate to={getDashboardPath(user.role)} replace />
+    }
+
+    if (oauthOnboarding) {
+        return (
+            <div className="auth-page auth-onboarding-page">
+                <button
+                    className="auth-home-btn"
+                    type="button"
+                    onClick={async () => {
+                        try {
+                            const { error } = await supabase.auth.signOut()
+                            if (error) console.error('[AUTH] Could not clear Google session:', error.message)
+                        } catch (error) {
+                            console.error('[AUTH] Could not clear Google session:', error.message)
+                        }
+                        window.sessionStorage.removeItem('pending_session')
+                        navigate('/login', { replace: true })
+                    }}
+                >
+                    Cancel setup
+                </button>
+                <div className="auth-layout">
+                    <div className="auth-form-panel auth-onboarding-panel">
+                        <div className="auth-form-inner auth-form-inner--register" data-lenis-prevent>
+                            <div className="auth-form-container">
+                                <RegisterForm ref={registerFormRef} oauthOnboarding />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        )
+    }
 
     return (
         <div className="auth-page" id="auth-page">

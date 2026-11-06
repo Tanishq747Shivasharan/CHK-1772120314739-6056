@@ -4,6 +4,142 @@ const { supabase, supabaseAdmin } = require('../config/supabaseClient');
 const { authenticateUser } = require('../middleware/authMiddleware');
 const { sendWelcomeDonor, sendWelcomeNGO } = require('../services/emailService');
 
+router.post('/oauth/profile', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({
+        error: 'Unauthorized',
+        message: 'A valid Google-authenticated session is required'
+      });
+    }
+
+    const token = authHeader.substring(7);
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    if (authError || !user || !user.email) {
+      return res.status(401).json({
+        error: 'Unauthorized',
+        message: 'The authentication session is invalid or expired'
+      });
+    }
+
+    const hasGoogleIdentity = user.app_metadata?.provider === 'google' ||
+      user.identities?.some(identity => identity.provider === 'google');
+    if (!hasGoogleIdentity) {
+      return res.status(403).json({
+        error: 'Google authentication required',
+        message: 'Complete sign-in with Google before creating an OAuth profile'
+      });
+    }
+
+    const { full_name, phone, role, organization_name, accepted_terms } = req.body;
+    const normalizedName = typeof full_name === 'string' ? full_name.trim() : '';
+    const normalizedPhone = typeof phone === 'string' ? phone.trim() : '';
+    const normalizedOrganization = typeof organization_name === 'string'
+      ? organization_name.trim()
+      : null;
+
+    if (!normalizedName || !normalizedPhone) {
+      return res.status(400).json({
+        error: 'Missing required fields',
+        required: ['full_name', 'phone']
+      });
+    }
+
+    if (!['donor', 'ngo', 'volunteer'].includes(role)) {
+      return res.status(400).json({
+        error: 'Invalid role',
+        message: 'Role must be donor, ngo, or volunteer'
+      });
+    }
+
+    if (accepted_terms !== true) {
+      return res.status(400).json({
+        error: 'Terms not accepted',
+        message: 'You must accept the Terms & Conditions to register.'
+      });
+    }
+
+    if (['donor', 'ngo'].includes(role) && !normalizedOrganization) {
+      return res.status(400).json({
+        error: 'Missing required fields',
+        message: 'organization_name is required for donor and ngo roles'
+      });
+    }
+
+    const { data: existingProfile, error: existingProfileError } = await supabaseAdmin
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (existingProfileError) {
+      throw existingProfileError;
+    }
+
+    if (existingProfile) {
+      return res.json({
+        user: { id: user.id, email: user.email, ...existingProfile },
+        existing: true
+      });
+    }
+
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from('profiles')
+      .insert({
+        id: user.id,
+        full_name: normalizedName,
+        email: user.email,
+        phone: normalizedPhone,
+        role,
+        organization_name: normalizedOrganization || null,
+        accepted_terms: true,
+        accepted_terms_timestamp: new Date().toISOString()
+      })
+      .select()
+      .single();
+
+    if (profileError) {
+      if (profileError.code === '23505') {
+        const { data: racedProfile, error: racedProfileError } = await supabaseAdmin
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .maybeSingle();
+
+        if (racedProfileError) {
+          throw racedProfileError;
+        }
+
+        if (racedProfile) {
+          return res.json({
+            user: { id: user.id, email: user.email, ...racedProfile },
+            existing: true
+          });
+        }
+
+        return res.status(409).json({
+          error: 'Profile already exists',
+          message: 'This email address or phone number is already associated with an account.'
+        });
+      }
+
+      throw profileError;
+    }
+
+    return res.status(201).json({
+      user: { id: user.id, email: user.email, ...profile },
+      existing: false
+    });
+  } catch (error) {
+    console.error('OAuth profile creation error:', error);
+    return res.status(500).json({
+      error: 'Profile creation failed',
+      message: error.message
+    });
+  }
+});
+
 router.post('/register', async (req, res) => {
   try {
     const {
@@ -38,10 +174,10 @@ router.post('/register', async (req, res) => {
       });
     }
 
-    if (!['donor', 'ngo', 'admin', 'volunteer'].includes(role)) {
+    if (!['donor', 'ngo', 'volunteer'].includes(role)) {
       return res.status(400).json({
         error: 'Invalid role',
-        message: 'Role must be one of: donor, ngo, admin, volunteer'
+        message: 'Role must be one of: donor, ngo, volunteer'
       });
     }
 

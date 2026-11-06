@@ -1,4 +1,22 @@
 /* ── Live Dashboard ── */
+.dashboard {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+}
+
+.dashboard__ambient {
+    position: absolute;
+    top: 3%;
+    right: -8rem;
+    width: clamp(18rem, 42vw, 38rem);
+    aspect-ratio: 1;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.25) 0%, rgba(255, 255, 255, 0.08) 42%, transparent 72%);
+    pointer-events: none;
+    z-index: -1;
+}
+
 .dashboard__grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);

@@ -4,6 +4,7 @@ import { gsap } from 'gsap'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../context/AuthContext'
 import LanguageSwitcher from './LanguageSwitcher/LanguageSwitcher'
+import { shouldSimplifyMotion } from '../lib/motionPreferences'
 import './Navbar.css'
 
 const Navbar = () => {
@@ -24,6 +25,8 @@ const Navbar = () => {
     }, [])
 
     useEffect(() => {
+        if (shouldSimplifyMotion()) return undefined
+
         // Entrance animation
         const ctx = gsap.context(() => {
             // Set initial hidden state

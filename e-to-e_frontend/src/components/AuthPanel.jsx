@@ -1,13 +1,24 @@
 import { useEffect, useRef, forwardRef, useState } from 'react'
 import { gsap } from 'gsap'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { loginUser, registerUser, createDonorProfile, createNGOProfile } from '../lib/api'
+import {
+    loginUser,
+    registerUser,
+    createDonorProfile,
+    createNGOProfile,
+    createOAuthProfile,
+    getCurrentUserForSession,
+    getDonorProfileForSession,
+    getNGOProfileForSession,
+} from '../lib/api'
 import { verifyDonor, verifyNGO } from '../lib/adminApi'
 import { useAuth } from '../context/AuthContext'
+import { supabase } from '../lib/supabaseClient'
 import StepIndicator from './auth/StepIndicator'
 import RoleSelector from './auth/RoleSelector'
 import LocationPicker from './auth/LocationPicker'
+import GoogleAuthButton from './auth/GoogleAuthButton'
 
 
 /* ─── Country Codes Data ─── */
@@ -79,7 +90,7 @@ function TermsModal({ onClose, onAccept }) {
 /* ─────────────────────────────────────────────
    LOGIN FORM
    ───────────────────────────────────────────── */
-export const LoginForm = forwardRef(function LoginForm({ onToggle, onOAuthRoleMissing, ...props }, ref) {
+export const LoginForm = forwardRef(function LoginForm({ onToggle }, ref) {
     const { t } = useTranslation('forms')
     const headingRef = useRef(null)
     const subtitleRef = useRef(null)
@@ -88,13 +99,14 @@ export const LoginForm = forwardRef(function LoginForm({ onToggle, onOAuthRoleMi
     const toggleRef = useRef(null)
 
     const navigate = useNavigate()
+    const location = useLocation()
     const auth = useAuth()
 
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
     const [showPassword, setShowPassword] = useState(false)
     const [loading, setLoading] = useState(false)
-    const [error, setError] = useState('')
+    const [error, setError] = useState(location.state?.authError || '')
 
     useEffect(() => {
         // --- GSAP Animations ---
@@ -218,6 +230,9 @@ export const LoginForm = forwardRef(function LoginForm({ onToggle, onOAuthRoleMi
                 </button>
             </form>
 
+            <div className="auth-social-divider"><span>or continue with</span></div>
+            <GoogleAuthButton onError={setError} disabled={loading} />
+
             <div className="auth-toggle" ref={toggleRef}>
                 {t('dontHaveAccount')}
                 <button
@@ -236,7 +251,7 @@ export const LoginForm = forwardRef(function LoginForm({ onToggle, onOAuthRoleMi
    REGISTER FORM — Multi-Step
    ───────────────────────────────────────────── */
 export const RegisterForm = forwardRef(function RegisterForm(
-    { onToggle },
+    { onToggle, oauthOnboarding = false },
     ref
 ) {
     const { t } = useTranslation('forms')
@@ -280,21 +295,105 @@ export const RegisterForm = forwardRef(function RegisterForm(
     const [ngoLng, setNgoLng] = useState(75.323726)
     const [serviceRadius, setServiceRadius] = useState(10)
 
-    /* Step 2 — Volunteer fields */
-    const [volunteerAddress, setVolunteerAddress] = useState('')
-    const [volunteerCity, setVolunteerCity] = useState('')
-    const [volunteerLat, setVolunteerLat] = useState(null)
-    const [volunteerLng, setVolunteerLng] = useState(null)
-    const [availability, setAvailability] = useState('weekends')
-    const [hasVehicle, setHasVehicle] = useState(false)
-
     /* General UI state */
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
-    const [registeredUserId, setRegisteredUserId] = useState(null)
+    const [oauthSession, setOAuthSession] = useState(null)
+    const [oauthLoading, setOAuthLoading] = useState(oauthOnboarding)
+    const [oauthProfileExists, setOAuthProfileExists] = useState(false)
 
     /* Refs for GSAP animations */
     const step2Ref = useRef(null)
+    const { login, getDashboardPath } = auth
+
+    useEffect(() => {
+        if (!oauthOnboarding) return
+
+        let cancelled = false
+        const prepareOAuthOnboarding = async () => {
+            setOAuthLoading(true)
+            setError('')
+
+            try {
+                const { data, error: sessionError } = await supabase.auth.getSession()
+                if (sessionError) throw sessionError
+
+                const session = data.session
+                if (!session?.access_token || !session.user) {
+                    navigate('/login', {
+                        replace: true,
+                        state: { authError: 'Your Google session expired. Please continue with Google again.' },
+                    })
+                    return
+                }
+
+                if (cancelled) return
+                setOAuthSession(session)
+                setFullName(
+                    session.user.user_metadata?.full_name ||
+                    session.user.user_metadata?.name ||
+                    ''
+                )
+                setEmail(session.user.email || '')
+
+                let existingUser
+                try {
+                    const result = await getCurrentUserForSession(session.access_token)
+                    existingUser = result.user
+                } catch (profileError) {
+                    if (profileError?.status !== 404 || profileError?.error !== 'Profile not found') {
+                        throw profileError
+                    }
+                }
+
+                if (!existingUser || cancelled) return
+
+                setFullName(existingUser.full_name || '')
+                setEmail(existingUser.email || '')
+                setPhoneNumber(existingUser.phone || '')
+                setOrganizationName(existingUser.organization_name || '')
+                setRole(existingUser.role)
+                setAcceptedTerms(true)
+                window.sessionStorage.setItem('pending_session', JSON.stringify({
+                    user: existingUser,
+                    session,
+                }))
+
+                let onboardingComplete = existingUser.role === 'volunteer' || existingUser.role === 'admin'
+                if (existingUser.role === 'donor') {
+                    try {
+                        await getDonorProfileForSession(session.access_token)
+                        onboardingComplete = true
+                    } catch (profileError) {
+                        if (profileError?.status !== 404) throw profileError
+                    }
+                } else if (existingUser.role === 'ngo') {
+                    const result = await getNGOProfileForSession(session.access_token)
+                    onboardingComplete = Boolean(result?.ngo)
+                }
+
+                if (onboardingComplete) {
+                    login(existingUser, session)
+                    navigate(getDashboardPath(existingUser.role), { replace: true })
+                    return
+                }
+
+                setOAuthProfileExists(true)
+                setStep(2)
+            } catch (prepareError) {
+                if (!cancelled) {
+                    setError(prepareError.message || 'Unable to continue Google registration.')
+                }
+            } finally {
+                if (!cancelled) setOAuthLoading(false)
+            }
+        }
+
+        prepareOAuthOnboarding()
+        return () => {
+            cancelled = true
+        }
+    }, [oauthOnboarding, navigate, login, getDashboardPath])
 
     // Split title text into characters
     const step1TitleChars = t('joinMovement').split('').map((char, i) => (
@@ -326,7 +425,11 @@ export const RegisterForm = forwardRef(function RegisterForm(
 
         // Validation
         const hasOrg = ['donor', 'ngo'].includes(role)
-        if (!fullName || !email || !password || !confirmPassword || !phoneNumber) {
+        if (
+            !fullName ||
+            (!oauthOnboarding && (!email || !password || !confirmPassword)) ||
+            !phoneNumber
+        ) {
             setError(t('pleaseFillAllFields'))
             return
         }
@@ -340,17 +443,49 @@ export const RegisterForm = forwardRef(function RegisterForm(
             return
         }
 
-        if (password !== confirmPassword) {
+        if (!oauthOnboarding && password !== confirmPassword) {
             setError(t('passwordsMustMatch'))
             return
         }
 
-        if (password.length < 6) {
+        if (!oauthOnboarding && password.length < 6) {
             setError(t('passwordMinLength'))
             return
         }
 
         const phone = `${countryCode} ${phoneNumber}`
+
+        if (oauthOnboarding && !oauthSession?.access_token) {
+            setError('Your Google session is not ready. Please try again.')
+            return
+        }
+
+        if (oauthOnboarding) {
+            setLoading(true)
+            try {
+                const data = await createOAuthProfile({
+                    full_name: fullName,
+                    phone,
+                    role,
+                    organization_name: organizationName || null,
+                    accepted_terms: true,
+                }, oauthSession.access_token)
+                setRole(data.user?.role || role)
+                setFullName(data.user?.full_name || fullName)
+                setOrganizationName(data.user?.organization_name || '')
+                window.sessionStorage.setItem('pending_session', JSON.stringify({
+                    user: data.user,
+                    session: oauthSession,
+                }))
+                setOAuthProfileExists(true)
+                setStep(2)
+            } catch (err) {
+                setError(err.message || t('registrationFailed'))
+            } finally {
+                setLoading(false)
+            }
+            return
+        }
 
         // For admin — no step 2 needed, register directly
         if (role === 'admin') {
@@ -366,8 +501,6 @@ export const RegisterForm = forwardRef(function RegisterForm(
                     accepted_terms: true,
                     accepted_terms_timestamp: new Date().toISOString()
                 })
-                setRegisteredUserId(data.user?.id)
-
                 // Store session data temporarily
                 window.sessionStorage.setItem('pending_session', JSON.stringify({
                     user: data.user,
@@ -397,8 +530,6 @@ export const RegisterForm = forwardRef(function RegisterForm(
                 accepted_terms: true,
                 accepted_terms_timestamp: new Date().toISOString()
             })
-            setRegisteredUserId(data.user?.id)
-
             // Store session data temporarily - DON'T login yet!
             // We'll login after Step 2 is completed
             window.sessionStorage.setItem('pending_session', JSON.stringify({
@@ -458,15 +589,17 @@ export const RegisterForm = forwardRef(function RegisterForm(
                 latitude: donorLat,
                 longitude: donorLng,
                 csr_participant: csrParticipant,
-            })
+            }, oauthOnboarding ? oauthSession?.access_token : undefined)
 
             // Auto-verify the donor to reduce admin manual work
-            try {
-                if (result?.donor?.donor_id) {
-                    await verifyDonor(result.donor.donor_id, true)
+            if (!oauthOnboarding) {
+                try {
+                    if (result?.donor?.donor_id) {
+                        await verifyDonor(result.donor.donor_id, true)
+                    }
+                } catch (verifyErr) {
+                    console.warn('Auto-verification failed (admin can verify later):', verifyErr)
                 }
-            } catch (verifyErr) {
-                console.warn('Auto-verification failed (admin can verify later):', verifyErr)
             }
 
             // Now login the user with the pending session
@@ -509,15 +642,17 @@ export const RegisterForm = forwardRef(function RegisterForm(
                 latitude: ngoLat,
                 longitude: ngoLng,
                 service_radius_km: serviceRadius,
-            })
+            }, oauthOnboarding ? oauthSession?.access_token : undefined)
 
             // Auto-verify the NGO to reduce admin manual work
-            try {
-                if (result?.ngo?.ngo_id) {
-                    await verifyNGO(result.ngo.ngo_id, true)
+            if (!oauthOnboarding) {
+                try {
+                    if (result?.ngo?.ngo_id) {
+                        await verifyNGO(result.ngo.ngo_id, true)
+                    }
+                } catch (verifyErr) {
+                    console.warn('Auto-verification failed (admin can verify later):', verifyErr)
                 }
-            } catch (verifyErr) {
-                console.warn('Auto-verification failed (admin can verify later):', verifyErr)
             }
 
             // Now login the user with the pending session
@@ -569,8 +704,19 @@ export const RegisterForm = forwardRef(function RegisterForm(
         ? ['Account']
         : ['Account', role === 'donor' ? 'Donor Details' : role === 'ngo' ? 'NGO Details' : 'Volunteer Details']
 
+    if (oauthLoading) {
+        return (
+            <div className="auth-form-block" ref={ref}>
+                <div className="auth-oauth-status" role="status" aria-live="polite">
+                    <span className="auth-btn-spinner" />
+                    <p>Preparing your Google account…</p>
+                </div>
+            </div>
+        )
+    }
+
     return (
-        <div className="auth-form-block auth-form-block--hidden" ref={ref}>
+        <div className={`auth-form-block ${oauthOnboarding ? '' : 'auth-form-block--hidden'}`} ref={ref}>
             {/* Step Indicator */}
             {step === 1 && !noStep2 && (
                 <StepIndicator currentStep={step} totalSteps={totalSteps} labels={stepLabels} />
@@ -587,12 +733,21 @@ export const RegisterForm = forwardRef(function RegisterForm(
                         {t('bePart')}
                     </p>
 
+                    {!oauthOnboarding && (
+                        <>
+                            <div className="auth-social-divider"><span>or continue with</span></div>
+                            <GoogleAuthButton onError={setError} disabled={loading} />
+                        </>
+                    )}
+
                     {error && <div className="auth-error-msg">{error}</div>}
 
-                    <div className="auth-input-group">
-                        <label>{t('selectYourRole')}</label>
-                        <RoleSelector value={role} onChange={setRole} />
-                    </div>
+                    {!oauthProfileExists && (
+                        <div className="auth-input-group">
+                            <label>{t('selectYourRole')}</label>
+                            <RoleSelector value={role} onChange={setRole} />
+                        </div>
+                    )}
 
                     <form onSubmit={handleStep1Submit}>
                         <div className="auth-fields">
@@ -617,12 +772,13 @@ export const RegisterForm = forwardRef(function RegisterForm(
                                     placeholder={t('emailPlaceholder')}
                                     autoComplete="email"
                                     value={email}
+                                    readOnly={oauthOnboarding}
                                     onChange={(e) => setEmail(e.target.value)}
                                 />
                                 <span className="auth-input-line" />
                             </div>
 
-                            <div className="auth-fields-row">
+                            {!oauthOnboarding && <div className="auth-fields-row">
                                 <div className="auth-input-group">
                                     <label htmlFor="register-password">{t('password')}</label>
                                     <div className="auth-password-wrapper">
@@ -670,7 +826,7 @@ export const RegisterForm = forwardRef(function RegisterForm(
                                     </div>
                                     <span className="auth-input-line" />
                                 </div>
-                            </div>
+                            </div>}
 
                             <div className="auth-input-group">
                                 <label htmlFor="register-phone">{t('phoneNumber')}</label>
@@ -751,16 +907,18 @@ export const RegisterForm = forwardRef(function RegisterForm(
                         </button>
                     </form>
 
-                    <div className="auth-toggle">
-                        {t('alreadyHaveAccount')}
-                        <button
-                            className="auth-toggle-link"
-                            type="button"
-                            onClick={onToggle}
-                        >
-                            {t('login')}
-                        </button>
-                    </div>
+                    {!oauthOnboarding && (
+                        <div className="auth-toggle">
+                            {t('alreadyHaveAccount')}
+                            <button
+                                className="auth-toggle-link"
+                                type="button"
+                                onClick={onToggle}
+                            >
+                                {t('login')}
+                            </button>
+                        </div>
+                    )}
                 </>
             )}
 

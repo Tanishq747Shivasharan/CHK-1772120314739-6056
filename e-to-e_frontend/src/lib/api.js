@@ -3,8 +3,8 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
 /**
  * Generic fetch wrapper with auth token injection
  */
-async function apiFetch(endpoint, options = {}) {
-    const token = localStorage.getItem('access_token')
+async function apiFetch(endpoint, options = {}, tokenOverride) {
+    const token = tokenOverride ?? localStorage.getItem('access_token')
 
     const headers = {
         'Content-Type': 'application/json',
@@ -71,20 +71,39 @@ export async function getCurrentUser() {
     return apiFetch('/auth/me')
 }
 
+export async function getCurrentUserForSession(accessToken) {
+    return apiFetch('/auth/me', {}, accessToken)
+}
+
+export async function createOAuthProfile(profileData, accessToken) {
+    return apiFetch('/auth/oauth/profile', {
+        method: 'POST',
+        body: JSON.stringify(profileData),
+    }, accessToken)
+}
+
 /* ─── Donor Endpoints ─── */
 
-export async function createDonorProfile(donorData) {
+export async function createDonorProfile(donorData, accessToken) {
     return apiFetch('/donors', {
         method: 'POST',
         body: JSON.stringify(donorData),
-    })
+    }, accessToken)
 }
 
 /* ─── NGO Endpoints ─── */
 
-export async function createNGOProfile(ngoData) {
+export async function createNGOProfile(ngoData, accessToken) {
     return apiFetch('/ngos', {
         method: 'POST',
         body: JSON.stringify(ngoData),
-    })
+    }, accessToken)
+}
+
+export async function getDonorProfileForSession(accessToken) {
+    return apiFetch('/donors/me', {}, accessToken)
+}
+
+export async function getNGOProfileForSession(accessToken) {
+    return apiFetch('/ngos/me', {}, accessToken)
 }

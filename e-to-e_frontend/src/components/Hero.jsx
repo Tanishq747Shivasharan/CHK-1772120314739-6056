@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { gsap } from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
+import { shouldSimplifyMotion } from '../lib/motionPreferences'
 import './Hero.css'
 
 gsap.registerPlugin(ScrollTrigger)
@@ -19,6 +20,8 @@ const Hero = () => {
     const [isPlaying, setIsPlaying] = useState(false)
 
     useEffect(() => {
+        if (shouldSimplifyMotion()) return undefined
+
         const ctx = gsap.context(() => {
             // Split text animation for heading
             const heading = headingRef.current
@@ -178,6 +181,8 @@ const Hero = () => {
                         src="https://i.pinimg.com/736x/95/e3/fd/95e3fd0c539f5ddfe698b1554c6644bb.jpg"
                         alt="Community food rescue"
                         className="hero__bg-img"
+                        fetchPriority="high"
+                        decoding="async"
                     />
                 </div>
                 <div className="hero__overlay" ref={overlayRef}></div>

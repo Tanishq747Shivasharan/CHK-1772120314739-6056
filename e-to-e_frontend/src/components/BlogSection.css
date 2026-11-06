@@ -17,6 +17,12 @@
     aspect-ratio: 3/2;
 }
 
+.blog-card__image-parallax {
+    position: absolute;
+    inset: -8% 0;
+    overflow: hidden;
+}
+
 .blog-card__image {
     width: 100%;
     height: 100%;
@@ -24,7 +30,7 @@
     transition: transform 0.6s var(--ease-out-expo);
 }
 
-.blog-card:hover .blog-card__image {
+.blog-card__image-wrapper:hover .blog-card__image {
     transform: scale(1.06);
 }
 
@@ -41,6 +47,7 @@
     letter-spacing: 0.05em;
     text-transform: uppercase;
     color: var(--tundora);
+    z-index: 1;
 }
 
 .blog-card__body {

@@ -587,6 +587,23 @@ p {
     }
 }
 
+@media (prefers-reduced-motion: reduce) {
+    html,
+    html.lenis,
+    html.lenis body {
+        scroll-behavior: auto !important;
+    }
+
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
 /* ── Language-Specific Font Support ── */
 /* Hindi and Marathi use Devanagari script */
 [lang="hi"],

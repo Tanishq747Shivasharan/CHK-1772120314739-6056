@@ -1,6 +1,7 @@
 import { useRef, useEffect } from 'react'
 import { gsap } from 'gsap'
 import './EssenceLine.css'
+import { shouldSimplifyMotion } from '../lib/motionPreferences'
 
 export default function EssenceLine({
     color = "var(--tundora)",
@@ -12,6 +13,8 @@ export default function EssenceLine({
     const lineRef = useRef(null)
 
     useEffect(() => {
+        if (shouldSimplifyMotion()) return undefined
+
         const ctx = gsap.context(() => {
             gsap.fromTo(lineRef.current,
                 { scaleX: 0, opacity: 0 },
