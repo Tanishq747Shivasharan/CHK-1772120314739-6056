@@ -13,6 +13,7 @@ const {
 } = require('../services/impactService');
 const { authenticateUser } = require('../middleware/authMiddleware');
 const { supabaseAdmin } = require('../config/supabaseClient');
+const { adminOnly } = require('../middleware/roleGuards');
 
 router.get('/total', async (req, res) => {
   try {
@@ -21,7 +22,7 @@ router.get('/total', async (req, res) => {
     if (!result.success) {
       return res.status(500).json({
         error: 'Failed to get impact metrics',
-        message: result.error
+        message: 'The request could not be completed.'
       });
     }
 
@@ -33,7 +34,7 @@ router.get('/total', async (req, res) => {
     console.error('Get total impact error:', error);
     res.status(500).json({
       error: 'Failed to get impact metrics',
-      message: error.message
+      message: 'The request could not be completed.'
     });
   }
 });
@@ -48,13 +49,19 @@ router.get('/period', async (req, res) => {
         required: ['start_date', 'end_date']
       });
     }
+    const start = Date.parse(start_date);
+    const end = Date.parse(end_date);
+    const maxRangeMs = 5 * 366 * 24 * 60 * 60 * 1000;
+    if (!Number.isFinite(start) || !Number.isFinite(end) || start > end || end - start > maxRangeMs) {
+      return res.status(400).json({ error: 'Invalid date range' });
+    }
 
     const result = await getImpactByPeriod(start_date, end_date);
 
     if (!result.success) {
       return res.status(500).json({
         error: 'Failed to get period impact',
-        message: result.error
+        message: 'The request could not be completed.'
       });
     }
 
@@ -66,21 +73,24 @@ router.get('/period', async (req, res) => {
     console.error('Get period impact error:', error);
     res.status(500).json({
       error: 'Failed to get period impact',
-      message: error.message
+      message: 'The request could not be completed.'
     });
   }
 });
 
 router.get('/leaderboard/donors', async (req, res) => {
   try {
-    const limit = parseInt(req.query.limit) || 10;
+    const limit = Number(req.query.limit ?? 10);
+    if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
+      return res.status(400).json({ error: 'Limit must be between 1 and 100' });
+    }
 
     const result = await getDonorLeaderboard(limit);
 
     if (!result.success) {
       return res.status(500).json({
         error: 'Failed to get donor leaderboard',
-        message: result.error
+        message: 'The request could not be completed.'
       });
     }
 
@@ -92,21 +102,24 @@ router.get('/leaderboard/donors', async (req, res) => {
     console.error('Get donor leaderboard error:', error);
     res.status(500).json({
       error: 'Failed to get donor leaderboard',
-      message: error.message
+      message: 'The request could not be completed.'
     });
   }
 });
 
 router.get('/performance/ngos', async (req, res) => {
   try {
-    const limit = parseInt(req.query.limit) || 10;
+    const limit = Number(req.query.limit ?? 10);
+    if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
+      return res.status(400).json({ error: 'Limit must be between 1 and 100' });
+    }
 
     const result = await getNGOPerformance(limit);
 
     if (!result.success) {
       return res.status(500).json({
         error: 'Failed to get NGO performance',
-        message: result.error
+        message: 'The request could not be completed.'
       });
     }
 
@@ -118,21 +131,24 @@ router.get('/performance/ngos', async (req, res) => {
     console.error('Get NGO performance error:', error);
     res.status(500).json({
       error: 'Failed to get NGO performance',
-      message: error.message
+      message: 'The request could not be completed.'
     });
   }
 });
 
 router.get('/trend/daily', async (req, res) => {
   try {
-    const days = parseInt(req.query.days) || 30;
+    const days = Number(req.query.days ?? 30);
+    if (!Number.isInteger(days) || days < 1 || days > 365) {
+      return res.status(400).json({ error: 'Days must be between 1 and 365' });
+    }
 
     const result = await getDailyImpactTrend(days);
 
     if (!result.success) {
       return res.status(500).json({
         error: 'Failed to get daily trend',
-        message: result.error
+        message: 'The request could not be completed.'
       });
     }
 
@@ -144,7 +160,7 @@ router.get('/trend/daily', async (req, res) => {
     console.error('Get daily trend error:', error);
     res.status(500).json({
       error: 'Failed to get daily trend',
-      message: error.message
+      message: 'The request could not be completed.'
     });
   }
 });
@@ -156,7 +172,7 @@ router.get('/city', async (req, res) => {
     if (!result.success) {
       return res.status(500).json({
         error: 'Failed to get city impact',
-        message: result.error
+        message: 'The request could not be completed.'
       });
     }
 
@@ -168,21 +184,24 @@ router.get('/city', async (req, res) => {
     console.error('Get city impact error:', error);
     res.status(500).json({
       error: 'Failed to get city impact',
-      message: error.message
+      message: 'The request could not be completed.'
     });
   }
 });
 
-router.get('/performance/volunteers', async (req, res) => {
+router.get('/performance/volunteers', authenticateUser, adminOnly, async (req, res) => {
   try {
     const ngoId = req.query.ngo_id || null;
+    if (ngoId !== null && (typeof ngoId !== 'string' || !/^[0-9a-f-]{36}$/i.test(ngoId))) {
+      return res.status(400).json({ error: 'Invalid NGO id' });
+    }
 
     const result = await getVolunteerPerformance(ngoId);
 
     if (!result.success) {
       return res.status(500).json({
         error: 'Failed to get volunteer performance',
-        message: result.error
+        message: 'The request could not be completed.'
       });
     }
 
@@ -194,7 +213,7 @@ router.get('/performance/volunteers', async (req, res) => {
     console.error('Get volunteer performance error:', error);
     res.status(500).json({
       error: 'Failed to get volunteer performance',
-      message: error.message
+      message: 'The request could not be completed.'
     });
   }
 });
@@ -206,7 +225,7 @@ router.get('/distribution/food-types', async (req, res) => {
     if (!result.success) {
       return res.status(500).json({
         error: 'Failed to get food distribution',
-        message: result.error
+        message: 'The request could not be completed.'
       });
     }
 
@@ -218,7 +237,7 @@ router.get('/distribution/food-types', async (req, res) => {
     console.error('Get food distribution error:', error);
     res.status(500).json({
       error: 'Failed to get food distribution',
-      message: error.message
+      message: 'The request could not be completed.'
     });
   }
 });
@@ -230,7 +249,7 @@ router.get('/dashboard', async (req, res) => {
     if (!result.success) {
       return res.status(500).json({
         error: 'Failed to get dashboard summary',
-        message: result.error
+        message: 'The request could not be completed.'
       });
     }
 
@@ -242,7 +261,7 @@ router.get('/dashboard', async (req, res) => {
     console.error('Get dashboard summary error:', error);
     res.status(500).json({
       error: 'Failed to get dashboard summary',
-      message: error.message
+      message: 'The request could not be completed.'
     });
   }
 });

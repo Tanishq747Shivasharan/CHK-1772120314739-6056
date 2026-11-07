@@ -145,7 +145,7 @@
     "live": "ప్రత్యక్ష",
     "notifications": "నోటిఫికేషన్‌లు",
     "noNewNotifications": "కొత్త నోటిఫికేషన్‌లు లేవు",
-    "userDonatedFood": "వినియోగదారు <strong>{{donorName}}</strong> {{quantity}}కేజీ {{foodType}} దానం చేశారు",
+    "userDonatedFood": "వినియోగదారు {{donorName}} {{quantity}}కేజీ {{foodType}} దానం చేశారు",
     "recentIncoming": "ఇటీవలి ఇన్‌కమింగ్",
     "donationsNearby": "సమీపంలోని దానాలు",
     "availableVolunteers": "అందుబాటులో ఉన్న స్వయంసేవకులు",

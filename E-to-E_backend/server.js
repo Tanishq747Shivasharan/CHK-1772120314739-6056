@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const { createRateLimiter } = require('./middleware/rateLimit');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -10,24 +11,46 @@ const ALLOWED_ORIGINS = (process.env.CORS_ORIGIN || 'http://localhost:5173')
   .map(o => o.trim())
   .filter(Boolean)
 
-app.use(cors({
-  origin: function (origin, callback) {
-    // Allow requests with no origin (e.g. curl / mobile apps)
-    if (!origin) return callback(null, true)
-    if (ALLOWED_ORIGINS.includes(origin) || ALLOWED_ORIGINS.includes('*')) {
-      return callback(null, true)
-    }
-    return callback(new Error(`CORS blocked: ${origin}`))
-  },
-  credentials: true
-}));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+if (ALLOWED_ORIGINS.includes('*')) {
+  throw new Error('CORS_ORIGIN must list specific trusted origins; wildcard origins are not allowed.');
+}
 
+app.set('trust proxy', false);
 app.use((req, res, next) => {
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
+  res.set({
+    'X-Content-Type-Options': 'nosniff',
+    'X-Frame-Options': 'DENY',
+    'Referrer-Policy': 'no-referrer',
+    'X-Permitted-Cross-Domain-Policies': 'none',
+    'Cache-Control': 'no-store',
+    'Content-Security-Policy': "default-src 'none'; frame-ancestors 'none';"
+  });
   next();
 });
+
+app.use(cors({
+  origin: function (origin, callback) {
+    if (!origin) return callback(null, true)
+    if (ALLOWED_ORIGINS.includes(origin)) {
+      return callback(null, true)
+    }
+    const error = new Error('Origin is not allowed')
+    error.status = 403
+    return callback(error)
+  },
+  credentials: false,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Authorization', 'Content-Type']
+}));
+
+const apiRateLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 1200,
+  message: 'Too many API requests. Please try again later.'
+});
+app.use('/api', apiRateLimiter);
+app.use(express.json({ limit: '64kb' }));
+app.use(express.urlencoded({ extended: false, limit: '8kb', parameterLimit: 50 }));
 
 const authRoutes = require('./routes/auth');
 const donorRoutes = require('./routes/donors');
@@ -41,19 +64,8 @@ const adminRoutes = require('./routes/admin');
 
 app.get('/', (req, res) => {
   res.json({
-    message: 'Smart Surplus Food Redistribution System API',
-    version: '1.0.0',
-    status: 'running',
-    endpoints: {
-      auth: '/api/auth',
-      donors: '/api/donors',
-      ngos: '/api/ngos',
-      listings: '/api/listings',
-      claims: '/api/claims',
-      deliveries: '/api/deliveries',
-      impact: '/api/impact',
-      admin: '/api/admin'
-    }
+    service: 'Extra-to-Essential API',
+    status: 'running'
   });
 });
 
@@ -74,54 +86,6 @@ app.use('/api/impact', impactRoutes);
 app.use('/api/geocode', geocodeRoutes);
 app.use('/api/admin', adminRoutes);
 
-const {
-  sendEmail,
-  sendWelcomeDonor,
-  sendWelcomeNGO,
-  sendListingCreatedEmail,
-  sendClaimAcceptedEmail,
-  sendDeliveryAssignedEmail,
-  sendDeliveryCompletedEmail,
-} = require('./services/emailService');
-
-app.get('/test-email', async (req, res) => {
-  const template = req.query.template || 'welcomeDonor';
-  const to = req.query.to || process.env.EMAIL_USER || 'test@example.com';
-
-  console.log(`[TEST-EMAIL] Sending "${template}" template to ${to}`);
-
-  const sampleData = {
-    welcomeDonor: () => sendWelcomeDonor({ to, userName: 'Test Donor', email: to, phone: '+91 98765 43210', organizationName: 'TestOrg Pvt Ltd' }),
-    welcomeNGO: () => sendWelcomeNGO({ to, userName: 'Test NGO Admin', email: to, phone: '+91 98765 43210', organizationName: 'Hope Foundation', contactPerson: 'Raj Sharma' }),
-    listingCreated: () => sendListingCreatedEmail({ to, ngoName: 'Hope Foundation', donorName: 'TestOrg Pvt Ltd', donorPhone: '+91 98765 43210', foodType: 'Cooked Rice & Curry', quantity: '25', mealEquivalent: '50', pickupAddress: '42 MG Road, Bengaluru, Karnataka', expiryTime: new Date(Date.now() + 6 * 3600000).toLocaleString(), distance: '3.2' }),
-    claimAccepted: () => sendClaimAcceptedEmail({ to, donorName: 'TestOrg Pvt Ltd', ngoName: 'Hope Foundation', ngoContact: 'Raj Sharma', ngoPhone: '+91 98765 43210', foodType: 'Cooked Rice & Curry', quantity: '25', pickupAddress: '42 MG Road, Bengaluru, Karnataka', pickupTime: new Date(Date.now() + 2 * 3600000).toLocaleString() }),
-    deliveryAssigned: () => sendDeliveryAssignedEmail({ to, volunteerName: 'Amit Kumar', ngoName: 'Hope Foundation', ngoPhone: '+91 98765 43210', donorName: 'TestOrg Pvt Ltd', donorPhone: '+91 98765 43211', foodType: 'Cooked Rice & Curry', quantity: '25', pickupAddress: '42 MG Road, Bengaluru, Karnataka', deliveryStatus: 'Assigned' }),
-    deliveryCompleted: () => sendDeliveryCompletedEmail({ to, recipientName: 'TestOrg Pvt Ltd', donorName: 'TestOrg Pvt Ltd', donorPhone: '+91 98765 43211', ngoName: 'Hope Foundation', ngoPhone: '+91 98765 43210', volunteerName: 'Amit Kumar', foodType: 'Cooked Rice & Curry', quantity: '25', mealEquivalent: '50', pickupAddress: '42 MG Road, Bengaluru, Karnataka', deliveryStatus: 'Delivered', completedAt: new Date().toLocaleString(), co2Saved: '62.50' }),
-  };
-
-  if (!sampleData[template]) {
-    return res.status(400).json({
-      error: 'Invalid template',
-      available: Object.keys(sampleData),
-      usage: 'GET /test-email?template=welcomeDonor&to=your@email.com',
-    });
-  }
-
-  try {
-    const result = await sampleData[template]();
-    console.log(`[TEST-EMAIL] Result:`, result);
-    res.json({
-      message: `Test email sent with template: ${template}`,
-      to,
-      template,
-      result,
-    });
-  } catch (error) {
-    console.error(`[TEST-EMAIL] Error:`, error);
-    res.status(500).json({ error: 'Email failed', message: error.message });
-  }
-});
-
 app.use((req, res) => {
   res.status(404).json({
     error: 'Not Found',
@@ -137,32 +101,38 @@ const io = new Server(server, {
   cors: {
     origin: ALLOWED_ORIGINS,
     methods: ["GET", "POST"],
-    credentials: true
+    credentials: false
+  }
+});
+
+const { supabase } = require('./config/supabaseClient');
+io.use(async (socket, next) => {
+  const token = socket.handshake.auth?.token;
+  if (typeof token !== 'string' || !token) return next(new Error('Unauthorized'));
+  try {
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+    if (error || !user) return next(new Error('Unauthorized'));
+    socket.data.userId = user.id;
+    return next();
+  } catch (_) {
+    return next(new Error('Unauthorized'));
   }
 });
 
 io.on('connection', (socket) => {
-  console.log('New client connected:', socket.id);
-
-  socket.on('join_room', (room) => {
-    socket.join(room);
-    console.log(`User ${socket.id} joined room: ${room}`);
-  });
-
-  socket.on('disconnect', () => {
-    console.log('Client disconnected:', socket.id);
-  });
+  socket.join(`user_${socket.data.userId}`);
 });
 
 app.set('io', io);
 
 app.use((err, req, res, next) => {
-  console.error('Global error handler:', err);
-
-  res.status(err.status || 500).json({
-    error: err.name || 'Internal Server Error',
-    message: err.message || 'An unexpected error occurred',
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+  const status = Number.isInteger(err.status) && err.status >= 400 && err.status < 500
+    ? err.status
+    : 500;
+  if (status >= 500) console.error('Unhandled API error:', err.name || 'Error');
+  res.status(status).json({
+    error: status === 413 ? 'Request too large' : status === 500 ? 'Internal Server Error' : 'Request rejected',
+    message: status === 413 ? 'The request body exceeds the allowed size.' : 'The request could not be completed.'
   });
 });
 
@@ -173,7 +143,6 @@ server.listen(PORT, "0.0.0.0", () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`API Base URL: http://localhost:${PORT}`);
-  console.log(`Network: http://172.19.239.240:${PORT}`);
   console.log('='.repeat(60));
 });
 
@@ -182,18 +151,6 @@ process.on('SIGTERM', () => {
   server.close(() => {
     console.log('HTTP server closed');
   });
-});
-
-console.log({
-  authRoutes,
-  donorRoutes,
-  ngoRoutes,
-  listingRoutes,
-  claimRoutes,
-  deliveryRoutes,
-  impactRoutes,
-  geocodeRoutes,
-  adminRoutes
 });
 
 module.exports = app;

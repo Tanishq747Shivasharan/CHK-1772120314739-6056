@@ -37,7 +37,7 @@ export default function CarbonConversionAnimation({ trigger, onComplete }) {
         if (tlRef.current) tlRef.current.kill()
 
         // Spawn particle elements
-        particles.innerHTML = ''
+        particles.replaceChildren()
         const NUM_PARTICLES = 18
         for (let i = 0; i < NUM_PARTICLES; i++) {
             const p = document.createElement('span')
@@ -53,7 +53,7 @@ export default function CarbonConversionAnimation({ trigger, onComplete }) {
                 gsap.set(overlay, { autoAlpha: 0 })
                 gsap.set(coin, { autoAlpha: 0 })
                 gsap.set(particles, { autoAlpha: 0 })
-                particles.innerHTML = ''
+                particles.replaceChildren()
                 hasRun.current = false
                 if (onComplete) onComplete()
             },

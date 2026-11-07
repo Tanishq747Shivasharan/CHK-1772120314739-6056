@@ -3,6 +3,9 @@ const path = require('path');
 const transporter = require('../utils/mailer');
 
 const templateCache = {};
+const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({
+  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+})[character]);
 
 const loadTemplate = (templateName, data = {}) => {
   if (!templateCache[templateName]) {
@@ -15,7 +18,7 @@ const loadTemplate = (templateName, data = {}) => {
 
   Object.entries(data).forEach(([key, value]) => {
     const regex = new RegExp(`{{${key}}}`, 'g');
-    html = html.replace(regex, value ?? '');
+    html = html.replace(regex, () => escapeHtml(value));
   });
 
   return html;
@@ -23,18 +26,22 @@ const loadTemplate = (templateName, data = {}) => {
 
 const sendEmail = async ({ to, subject, html }) => {
   try {
+    const recipient = typeof to === 'string' ? to.trim() : '';
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient) || recipient.length > 254) {
+      return { success: false, error: 'Invalid recipient' };
+    }
     const info = await transporter.sendMail({
       from: process.env.EMAIL_FROM,
-      to,
-      subject,
+      to: recipient,
+      subject: String(subject || '').replace(/[\r\n]+/g, ' ').slice(0, 200),
       html,
     });
 
-    console.log(`[EMAIL] ✅ Email sent — to: ${to}, subject: "${subject}", messageId: ${info.messageId}`);
+    console.log('[EMAIL] Email sent');
     return { success: true, messageId: info.messageId };
   } catch (error) {
-    console.error(`[EMAIL] ❌ Email failed — to: ${to}, subject: "${subject}", error: ${error.message}`);
-    return { success: false, error: error.message };
+    console.error('[EMAIL] Email delivery failed:', error.name || 'Error');
+    return { success: false, error: 'Email delivery failed' };
   }
 };
 
@@ -208,10 +215,6 @@ const sendDeliveryCompletedEmail = async ({
 };
 
 const sendCollectionOtpEmail = async ({ to, code, donorName, foodType, ngoName, expiresInMinutes = 10 }) => {
-  const escapeHtml = (value) => String(value || '').replace(/[&<>"']/g, (character) => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-  })[character]);
-
   return sendEmail({
     to,
     subject: `Pickup verification code for ${foodType || 'your donation'}`,

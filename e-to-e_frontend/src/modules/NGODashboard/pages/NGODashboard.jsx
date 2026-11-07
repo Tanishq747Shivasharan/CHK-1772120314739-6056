@@ -10,7 +10,7 @@ import MapPanel from '../components/MapPanel'
 import ActivityLog from '../components/ActivityLog'
 import FoodRequest from '../components/FoodRequest'
 import NotificationToast from '../components/NotificationToast'
-import { useSocket } from '../../../context/SocketContext'
+import { useSocket } from '../../../context/socketContextValue'
 import { Bell, X } from 'lucide-react'
 import { runPageLoadSequence, animateViewEnter, killAllAnimations } from '../animations/ngoAnimations'
 import { CarbonWallet } from '../../../components/CarbonWallet'
@@ -221,13 +221,11 @@ function DashboardInner() {
                                                 <div key={alert.id} className="ngo-notification-item">
                                                     <div className="ngo-notification-item__icon">🍱</div>
                                                     <div className="ngo-notification-item__content">
-                                                        <p dangerouslySetInnerHTML={{
-                                                            __html: t('ngo.userDonatedFood', {
+                                                        <p>{t('ngo.userDonatedFood', {
                                                                 donorName: getDonorDisplayName(alert, t('ngo.unknownDonor')),
                                                                 quantity: alert.quantity_kg,
                                                                 foodType: alert.food_type
-                                                            })
-                                                        }} />
+                                                            })}</p>
                                                         <span>{alert.time}</span>
                                                     </div>
                                                 </div>

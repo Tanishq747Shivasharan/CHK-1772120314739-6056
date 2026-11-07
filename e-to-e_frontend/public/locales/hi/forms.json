@@ -239,7 +239,7 @@
   "pleaseFillAllFields": "कृपया सभी फ़ील्ड भरें।",
   "pleaseFillOrgName": "कृपया संगठन का नाम भरें।",
   "passwordsMustMatch": "पासवर्ड मेल नहीं खाते।",
-  "passwordMinLength": "पासवर्ड कम से कम 6 वर्णों का होना चाहिए।",
+  "passwordMinLength": "पासवर्ड कम से कम 12 वर्णों का होना चाहिए।",
   "loginFailed": "लॉगिन विफल। अपनी साख जांचें।",
   "registrationFailed": "पंजीकरण विफल।",
   "selectAddressFromSuggestions": "कृपया सुझावों में से एक पता चुनें।",

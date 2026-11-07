@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { supabaseAdmin } = require('../config/supabaseClient');
 const { authenticateUser } = require('../middleware/authMiddleware');
-const { donorOnly, ngoOnly } = require('../middleware/roleGuards');
+const { donorOnly, ngoOnly, adminOnly, requireRole } = require('../middleware/roleGuards');
 const geoMatchService = require('../services/geoMatchService');
 const {
   getAvailableListingsForNGO,
@@ -25,10 +25,20 @@ router.post('/', authenticateUser, donorOnly, async (req, res) => {
       assigned_ngo_id,
     } = req.body;
 
-    if (!food_type || !quantity_kg || !meal_equivalent || !expiry_time || !pickup_address || !latitude || !longitude) {
+    const quantity = Number(quantity_kg);
+    const meals = Number(meal_equivalent);
+    const lat = Number(latitude);
+    const lng = Number(longitude);
+    if (typeof food_type !== 'string' || !food_type.trim() || food_type.trim().length > 120
+      || !Number.isFinite(quantity) || quantity <= 0 || quantity > 10000
+      || !Number.isInteger(meals) || meals <= 0 || meals > 100000
+      || typeof pickup_address !== 'string' || !pickup_address.trim() || pickup_address.trim().length > 500
+      || !Number.isFinite(lat) || Math.abs(lat) > 90
+      || !Number.isFinite(lng) || Math.abs(lng) > 180
+      || typeof expiry_time !== 'string' || !expiry_time) {
       return res.status(400).json({
-        error: 'Missing required fields',
-        required: ['food_type', 'quantity_kg', 'meal_equivalent', 'expiry_time', 'pickup_address', 'latitude', 'longitude']
+        error: 'Invalid listing details',
+        message: 'Provide valid food, quantity, meal count, expiry, pickup address, and coordinates.'
       });
     }
 
@@ -48,6 +58,19 @@ router.post('/', authenticateUser, donorOnly, async (req, res) => {
     }
 
     const expiryISO = parsedExpiry.toISOString(); 
+
+    if (assigned_ngo_id !== undefined && assigned_ngo_id !== null) {
+      if (typeof assigned_ngo_id !== 'string' || !/^[0-9a-f-]{36}$/i.test(assigned_ngo_id)) {
+        return res.status(400).json({ error: 'Invalid assigned NGO' });
+      }
+      const { data: assignedNgo } = await supabaseAdmin
+        .from('ngos')
+        .select('ngo_id')
+        .eq('ngo_id', assigned_ngo_id)
+        .eq('verification_status', true)
+        .maybeSingle();
+      if (!assignedNgo) return res.status(400).json({ error: 'Assigned NGO is unavailable' });
+    }
 
     const { data: donor, error: donorError } = await supabaseAdmin
       .from('donors')
@@ -70,13 +93,13 @@ router.post('/', authenticateUser, donorOnly, async (req, res) => {
       .from('food_listings')
       .insert({
         donor_id: donor.donor_id,
-        food_type,
-        quantity_kg,
-        meal_equivalent,
+        food_type: food_type.trim(),
+        quantity_kg: quantity,
+        meal_equivalent: meals,
         expiry_time: expiryISO,
-        pickup_address,
-        latitude,
-        longitude,
+        pickup_address: pickup_address.trim(),
+        latitude: lat,
+        longitude: lng,
         status: 'open',
         is_locked: false,
         assigned_ngo_id: assigned_ngo_id || null
@@ -86,14 +109,14 @@ router.post('/', authenticateUser, donorOnly, async (req, res) => {
 
     if (error) {
       console.error('Supabase insert error:', {
-        message: error.message,
+        message: 'The request could not be completed.',
         code: error.code,
         details: error.details,
         hint: error.hint,
       });
       return res.status(500).json({
         error: 'Failed to create listing',
-        message: error.message
+        message: 'The request could not be completed.'
       });
     }
 
@@ -170,19 +193,19 @@ router.post('/', authenticateUser, donorOnly, async (req, res) => {
     console.error('Create listing error:', error);
     res.status(500).json({
       error: 'Failed to create listing',
-      message: error.message
+      message: 'The request could not be completed.'
     });
   }
 });
 
-router.get('/', authenticateUser, async (req, res) => {
+router.get('/', authenticateUser, requireRole('ngo', 'admin'), async (req, res) => {
   try {
-    const { status, city } = req.query;
+    const { status } = req.query;
 
     if (req.user.role === 'ngo') {
       const { data: ngo, error: ngoError } = await supabaseAdmin
         .from('ngos')
-        .select('ngo_id')
+        .select('ngo_id, verification_status')
         .eq('profile_id', req.user.id)
         .single();
 
@@ -190,22 +213,24 @@ router.get('/', authenticateUser, async (req, res) => {
         console.error('NGO lookup error:', ngoError);
       }
 
-      if (ngo) {
-        const result = await getAvailableListingsForNGO(ngo.ngo_id);
+      if (!ngo) return res.status(404).json({ error: 'NGO profile not found' });
+      if (!ngo.verification_status) {
+        return res.status(403).json({ error: 'Verified NGO access required' });
+      }
+      const result = await getAvailableListingsForNGO(ngo.ngo_id);
 
-        if (!result.success) {
-          console.error('getAvailableListingsForNGO failed:', result.error);
-          return res.status(500).json({
-            error: 'Failed to fetch listings',
-            message: result.error
-          });
-        }
-
-        return res.json({
-          listings: result.listings,
-          count: result.count
+      if (!result.success) {
+        console.error('getAvailableListingsForNGO failed:', result.error);
+        return res.status(500).json({
+          error: 'Failed to fetch listings',
+          message: 'Listings could not be loaded.'
         });
       }
+
+      return res.json({
+        listings: result.listings,
+        count: result.count
+      });
     }
 
     let query = supabaseAdmin
@@ -214,37 +239,35 @@ router.get('/', authenticateUser, async (req, res) => {
         *,
         donors (
           donor_id,
-          city,
-          address
+          city
         )
       `);
 
-    if (req.user.role === 'admin') {
-      if (status) {
-        query = query.eq('status', status);
+    if (status) {
+      const allowedStatuses = ['open', 'in_discussion', 'claimed', 'scheduled', 'picked', 'completed', 'expired'];
+      if (req.user.role !== 'admin' && !['open', 'in_discussion'].includes(status)) {
+        return res.status(403).json({ error: 'That listing status is not available to this role.' });
       }
-    } else {
-      if (status) {
-        query = query.eq('status', status);
-      } else {
-        query = query.in('status', ['open', 'in_discussion']);
-      }
+      if (!allowedStatuses.includes(status)) return res.status(400).json({ error: 'Invalid listing status' });
+      query = query.eq('status', status);
+    } else if (req.user.role !== 'admin') {
+      query = query.in('status', ['open', 'in_discussion']);
     }
 
-    query = query.order('created_at', { ascending: false });
+    query = query.order('created_at', { ascending: false }).limit(100);
 
     const { data: listings, error } = await query;
 
     if (error) {
       console.error('Listings query error:', {
-        message: error.message,
+        message: 'The request could not be completed.',
         code: error.code,
         details: error.details,
         hint: error.hint,
       });
       return res.status(500).json({
         error: 'Unable to load food listings at this time. Please try again.',
-        message: error.message
+        message: 'The request could not be completed.'
       });
     }
 
@@ -257,7 +280,7 @@ router.get('/', authenticateUser, async (req, res) => {
     console.error('Get listings error:', error);
     res.status(500).json({
       error: 'Failed to get listings',
-      message: error.message
+      message: 'The request could not be completed.'
     });
   }
 });
@@ -285,7 +308,7 @@ router.get('/my', authenticateUser, donorOnly, async (req, res) => {
     if (error) {
       return res.status(500).json({
         error: 'Failed to fetch listings',
-        message: error.message
+        message: 'The request could not be completed.'
       });
     }
 
@@ -298,20 +321,26 @@ router.get('/my', authenticateUser, donorOnly, async (req, res) => {
     console.error('Get my listings error:', error);
     res.status(500).json({
       error: 'Failed to get listings',
-      message: error.message
+      message: 'The request could not be completed.'
     });
   }
 });
 
-router.get('/search', authenticateUser, async (req, res) => {
+router.get('/search', authenticateUser, requireRole('ngo', 'admin'), async (req, res) => {
   try {
     const { q } = req.query;
 
-    if (!q) {
+    if (typeof q !== 'string' || !q.trim() || q.trim().length > 100) {
       return res.status(400).json({
         error: 'Missing search query',
         message: 'Please provide a search term (e.g., ?q=Rice)'
       });
+    }
+
+    if (req.user.role === 'ngo') {
+      const { data: ngo } = await supabaseAdmin
+        .from('ngos').select('verification_status').eq('profile_id', req.user.id).maybeSingle();
+      if (!ngo || !ngo.verification_status) return res.status(403).json({ error: 'Verified NGO access required' });
     }
 
     const { data: listings, error } = await supabaseAdmin
@@ -330,14 +359,15 @@ router.get('/search', authenticateUser, async (req, res) => {
       `)
       .eq('status', 'open')
       .gt('expiry_time', new Date().toISOString())
-      .ilike('food_type', `%${q}%`)
-      .order('created_at', { ascending: false });
+      .ilike('food_type', `%${q.trim()}%`)
+      .order('created_at', { ascending: false })
+      .limit(100);
 
     if (error) {
       console.error('Listings search error:', error);
       return res.status(500).json({
         error: 'Failed to search listings',
-        message: error.message
+        message: 'The request could not be completed.'
       });
     }
 
@@ -350,12 +380,12 @@ router.get('/search', authenticateUser, async (req, res) => {
     console.error('Search listings error:', error);
     res.status(500).json({
       error: 'Failed to search listings',
-      message: error.message
+      message: 'The request could not be completed.'
     });
   }
 });
 
-router.get('/:listing_id', async (req, res) => {
+router.get('/:listing_id', authenticateUser, async (req, res) => {
   try {
     const { listing_id } = req.params;
 
@@ -365,8 +395,7 @@ router.get('/:listing_id', async (req, res) => {
         *,
         donors (
           donor_id,
-          city,
-          address
+          city
         )
       `)
       .eq('listing_id', listing_id)
@@ -378,6 +407,26 @@ router.get('/:listing_id', async (req, res) => {
       });
     }
 
+    if (req.user.role === 'donor') {
+      const { data: donor } = await supabaseAdmin
+        .from('donors').select('donor_id').eq('profile_id', req.user.id).maybeSingle();
+      if (!donor || donor.donor_id !== listing.donor_id) {
+        return res.status(404).json({ error: 'Listing not found' });
+      }
+    } else if (req.user.role === 'ngo') {
+      const { data: ngo } = await supabaseAdmin
+        .from('ngos').select('ngo_id, verification_status').eq('profile_id', req.user.id).maybeSingle();
+      if (!ngo || !ngo.verification_status) return res.status(403).json({ error: 'Verified NGO access required' });
+
+      if (!['open', 'in_discussion'].includes(listing.status)) {
+        const { data: ownClaim } = await supabaseAdmin
+          .from('ngo_claims').select('claim_id').eq('listing_id', listing_id).eq('ngo_id', ngo.ngo_id).maybeSingle();
+        if (!ownClaim) return res.status(404).json({ error: 'Listing not found' });
+      }
+    } else if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
     res.json({
       listing
     });
@@ -386,7 +435,7 @@ router.get('/:listing_id', async (req, res) => {
     console.error('Get listing error:', error);
     res.status(500).json({
       error: 'Failed to get listing',
-      message: error.message
+      message: 'The request could not be completed.'
     });
   }
 });
@@ -436,9 +485,26 @@ router.put('/:listing_id', authenticateUser, donorOnly, async (req, res) => {
     }
 
     const updates = {};
-    if (food_type !== undefined) updates.food_type = food_type;
-    if (quantity_kg !== undefined) updates.quantity_kg = quantity_kg;
-    if (meal_equivalent !== undefined) updates.meal_equivalent = meal_equivalent;
+    if (food_type !== undefined) {
+      if (typeof food_type !== 'string' || !food_type.trim() || food_type.trim().length > 120) {
+        return res.status(400).json({ error: 'Invalid food type' });
+      }
+      updates.food_type = food_type.trim();
+    }
+    if (quantity_kg !== undefined) {
+      const quantity = Number(quantity_kg);
+      if (!Number.isFinite(quantity) || quantity <= 0 || quantity > 10000) {
+        return res.status(400).json({ error: 'Invalid quantity' });
+      }
+      updates.quantity_kg = quantity;
+    }
+    if (meal_equivalent !== undefined) {
+      const meals = Number(meal_equivalent);
+      if (!Number.isInteger(meals) || meals <= 0 || meals > 100000) {
+        return res.status(400).json({ error: 'Invalid meal count' });
+      }
+      updates.meal_equivalent = meals;
+    }
     if (expiry_time !== undefined) {
       const parsedExpiry = new Date(expiry_time);
       if (isNaN(parsedExpiry.getTime()) || parsedExpiry <= new Date()) {
@@ -449,22 +515,36 @@ router.put('/:listing_id', authenticateUser, donorOnly, async (req, res) => {
       }
       updates.expiry_time = parsedExpiry.toISOString();
     }
-    if (pickup_address !== undefined) updates.pickup_address = pickup_address;
-    if (latitude !== undefined) updates.latitude = latitude;
-    if (longitude !== undefined) updates.longitude = longitude;
+    if (pickup_address !== undefined) {
+      if (typeof pickup_address !== 'string' || !pickup_address.trim() || pickup_address.trim().length > 500) {
+        return res.status(400).json({ error: 'Invalid pickup address' });
+      }
+      updates.pickup_address = pickup_address.trim();
+    }
+    if (latitude !== undefined) {
+      const lat = Number(latitude);
+      if (!Number.isFinite(lat) || Math.abs(lat) > 90) return res.status(400).json({ error: 'Invalid latitude' });
+      updates.latitude = lat;
+    }
+    if (longitude !== undefined) {
+      const lng = Number(longitude);
+      if (!Number.isFinite(lng) || Math.abs(lng) > 180) return res.status(400).json({ error: 'Invalid longitude' });
+      updates.longitude = lng;
+    }
+    if (Object.keys(updates).length === 0) return res.status(400).json({ error: 'No valid listing updates provided' });
 
     const { data: listing, error } = await supabaseAdmin
       .from('food_listings')
       .update(updates)
       .eq('listing_id', listing_id)
+      .eq('donor_id', donor.donor_id)
+      .eq('status', existing.status)
+      .eq('is_locked', existing.is_locked)
       .select()
       .single();
 
     if (error) {
-      return res.status(500).json({
-        error: 'Failed to update listing',
-        message: error.message
-      });
+      return res.status(error.code === 'PGRST116' ? 409 : 500).json({ error: 'Failed to update listing' });
     }
 
     res.json({
@@ -476,7 +556,7 @@ router.put('/:listing_id', authenticateUser, donorOnly, async (req, res) => {
     console.error('Update listing error:', error);
     res.status(500).json({
       error: 'Failed to update listing',
-      message: error.message
+      message: 'The request could not be completed.'
     });
   }
 });
@@ -519,12 +599,15 @@ router.delete('/:listing_id', authenticateUser, donorOnly, async (req, res) => {
     const { error } = await supabaseAdmin
       .from('food_listings')
       .delete()
-      .eq('listing_id', listing_id);
+      .eq('listing_id', listing_id)
+      .eq('donor_id', donor.donor_id)
+      .in('status', ['open', 'in_discussion'])
+      .eq('is_locked', false);
 
     if (error) {
       return res.status(500).json({
         error: 'Failed to delete listing',
-        message: error.message
+        message: 'The request could not be completed.'
       });
     }
 
@@ -536,7 +619,7 @@ router.delete('/:listing_id', authenticateUser, donorOnly, async (req, res) => {
     console.error('Delete listing error:', error);
     res.status(500).json({
       error: 'Failed to delete listing',
-      message: error.message
+      message: 'The request could not be completed.'
     });
   }
 });

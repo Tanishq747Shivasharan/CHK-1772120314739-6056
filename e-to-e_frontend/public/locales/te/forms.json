@@ -239,7 +239,7 @@
   "pleaseFillAllFields": "దయచేసి అన్ని ఫీల్డ్‌లను పూరించండి.",
   "pleaseFillOrgName": "దయచేసి సంస్థ పేరును పూరించండి.",
   "passwordsMustMatch": "పాస్‌వర్డ్‌లు సరిపోలడం లేదు.",
-  "passwordMinLength": "పాస్‌వర్డ్ కనీసం ౬ అక్షరాలు ఉండాలి.",
+  "passwordMinLength": "పాస్‌వర్డ్ కనీసం ౧౨ అక్షరాలు ఉండాలి.",
   "loginFailed": "లాగిన్ విఫలమైంది. మీ క్రెడెన్షియల్‌లను తనిఖీ చేయండి.",
   "registrationFailed": "నమోదు విఫలమైంది.",
   "selectAddressFromSuggestions": "దయచేసి సూచనల నుండి చిరునామాను ఎంచుకోండి.",

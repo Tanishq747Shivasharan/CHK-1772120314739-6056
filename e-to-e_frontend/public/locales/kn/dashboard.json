@@ -145,7 +145,7 @@
     "live": "ಲೈವ್",
     "notifications": "ಅಧಿಸೂಚನೆಗಳು",
     "noNewNotifications": "ಯಾವುದೇ ಹೊಸ ಅಧಿಸೂಚನೆಗಳಿಲ್ಲ",
-    "userDonatedFood": "ಬಳಕೆದಾರ <strong>{{donorName}}</strong> ರವರು {{quantity}}ಕೆಜಿ {{foodType}} ದೇಣಿಗೆ ನೀಡಿದ್ದಾರೆ",
+    "userDonatedFood": "ಬಳಕೆದಾರ {{donorName}} ರವರು {{quantity}}ಕೆಜಿ {{foodType}} ದೇಣಿಗೆ ನೀಡಿದ್ದಾರೆ",
     "recentIncoming": "ಇತ್ತೀಚೆಗೆ ಒಳಬಂದವು",
     "donationsNearby": "ಹತ್ತಿರದ ದೇಣಿಗೆಗಳು",
     "availableVolunteers": "ಲಭ್ಯವಿರುವ ಸ್ವಯಂಸೇವಕರು",

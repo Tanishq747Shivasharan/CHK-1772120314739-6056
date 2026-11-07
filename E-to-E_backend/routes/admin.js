@@ -63,7 +63,7 @@ router.get('/impact-overview', authenticateUser, adminOnly, async (req, res) => 
     console.error('Admin impact overview error:', error);
     res.status(500).json({
       error: 'Failed to fetch admin impact overview',
-      message: error.message
+      message: 'The request could not be completed.'
     });
   }
 });

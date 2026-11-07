@@ -35,7 +35,7 @@ const sendNotification = async (phoneNumber, messageType, messageBody, additiona
       })
       .eq('notification_id', notificationLogId);
 
-    console.log(`Notification log created for ${phoneNumber}: ${messageType}`);
+    console.log(`Notification log created: ${messageType}`);
 
     return {
       success: true,
@@ -44,21 +44,21 @@ const sendNotification = async (phoneNumber, messageType, messageBody, additiona
     };
 
   } catch (error) {
-    console.error('Notification error:', error.message);
+    console.error('Notification error:', error.name || 'Error');
 
     if (notificationLogId) {
       await supabaseAdmin
         .from('notification_logs')
         .update({
           delivery_status: 'failed',
-          error_message: error.message
+          error_message: 'Notification delivery failed'
         })
         .eq('notification_id', notificationLogId);
     }
 
     return {
       success: false,
-      error: error.message
+      error: 'Notification delivery failed'
     };
   }
 };

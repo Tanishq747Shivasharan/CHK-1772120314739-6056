@@ -26,7 +26,7 @@ const Hero = () => {
             // Split text animation for heading
             const heading = headingRef.current
             const text = heading.textContent
-            heading.innerHTML = ''
+            heading.replaceChildren()
 
             // Create word spans
             const words = text.split(' ')

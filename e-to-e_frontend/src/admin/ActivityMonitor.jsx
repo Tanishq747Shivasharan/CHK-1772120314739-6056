@@ -77,12 +77,11 @@ export default function ActivityMonitor({ feed }) {
                 <div className="admin-activity__list" ref={listRef}>
                     {feed.map(item => (
                         <div key={item.id} className="admin-activity__item">
-                            <span className={`admin-activity__dot admin-activity__dot--${item.type}`} />
+                            <span className={`admin-activity__dot admin-activity__dot--${['ngo', 'donation', 'pickup', 'delivery'].includes(item.type) ? item.type : 'event'}`} />
                             <div className="admin-activity__text">
-                                <div
-                                    className="admin-activity__msg"
-                                    dangerouslySetInnerHTML={{ __html: item.message }}
-                                />
+                                <div className="admin-activity__msg">
+                                    {item.prefix}<strong>{item.subject}</strong>{item.suffix}
+                                </div>
                                 <span className="admin-activity__time">{timeAgo(item.time)}</span>
                             </div>
                         </div>

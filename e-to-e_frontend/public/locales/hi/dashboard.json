@@ -146,7 +146,7 @@
     "live": "लाइव",
     "notifications": "सूचनाएं",
     "noNewNotifications": "कोई नई सूचना नहीं",
-    "userDonatedFood": "उपयोगकर्ता <strong>{{donorName}}</strong> ने {{quantity}}किलो {{foodType}} का दान किया है",
+    "userDonatedFood": "उपयोगकर्ता {{donorName}} ने {{quantity}}किलो {{foodType}} का दान किया है",
     "recentIncoming": "हाल ही में आने वाले",
     "donationsNearby": "पास के दान",
     "availableVolunteers": "उपलब्ध स्वयंसेवक",

@@ -146,7 +146,7 @@
     "live": "Live",
     "notifications": "Notifications",
     "noNewNotifications": "No new notifications",
-    "userDonatedFood": "User <strong>{{donorName}}</strong> has made a donation of {{quantity}}kg {{foodType}}",
+    "userDonatedFood": "User {{donorName}} has made a donation of {{quantity}}kg {{foodType}}",
     "recentIncoming": "Recent Incoming",
     "donationsNearby": "Donations Nearby",
     "availableVolunteers": "Available Volunteers",

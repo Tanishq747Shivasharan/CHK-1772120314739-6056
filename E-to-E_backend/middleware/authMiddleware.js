@@ -11,7 +11,10 @@ const authenticateUser = async (req, res, next) => {
       });
     }
 
-    const token = authHeader.substring(7); 
+    const token = authHeader.substring(7).trim();
+    if (!token || token.length > 4096) {
+      return res.status(401).json({ error: 'Unauthorized', message: 'Invalid or expired token' });
+    }
 
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
 
@@ -36,17 +39,17 @@ const authenticateUser = async (req, res, next) => {
     }
 
     req.user = {
+      ...profile,
       id: user.id,
-      email: user.email,
-      ...profile
+      email: user.email
     };
 
     next();
   } catch (error) {
-    console.error('Authentication error:', error);
+    console.error('Authentication error:', error.name || 'Error');
     return res.status(500).json({
       error: 'Authentication failed',
-      message: error.message
+      message: 'Authentication could not be completed.'
     });
   }
 };

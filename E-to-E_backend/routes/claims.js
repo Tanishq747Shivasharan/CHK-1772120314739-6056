@@ -29,28 +29,34 @@ async function createUnassignedDelivery(claimId) {
 router.post('/', authenticateUser, ngoOnly, async (req, res) => {
   try {
     const { listing_id, pickup_scheduled_time, strategy_notes } = req.body;
-    console.log('[CLAIMS] POST /api/claims - Body:', JSON.stringify(req.body));
 
-    if (!listing_id) {
+    if (typeof listing_id !== 'string' || !/^[0-9a-f-]{36}$/i.test(listing_id)) {
       return res.status(400).json({ error: 'Missing required field: listing_id' });
+    }
+    if (pickup_scheduled_time !== undefined && pickup_scheduled_time !== null
+      && (typeof pickup_scheduled_time !== 'string' || !Number.isFinite(Date.parse(pickup_scheduled_time)))) {
+      return res.status(400).json({ error: 'Invalid pickup schedule' });
+    }
+    if (strategy_notes !== undefined && strategy_notes !== null
+      && (typeof strategy_notes !== 'string' || strategy_notes.length > 1000)) {
+      return res.status(400).json({ error: 'Invalid strategy notes' });
     }
 
     const { data: ngo, error: ngoErr } = await supabaseAdmin
       .from('ngos')
-      .select('ngo_id, ngo_name')
+      .select('ngo_id, ngo_name, verification_status')
       .eq('profile_id', req.user.id)
       .single();
 
     if (ngoErr || !ngo) {
-      console.error('[CLAIMS] NGO lookup error:', ngoErr);
       return res.status(404).json({ error: 'NGO profile not found' });
     }
-    console.log('[CLAIMS] NGO found:', ngo.ngo_id, ngo.ngo_name);
+    if (!ngo.verification_status) return res.status(403).json({ error: 'Verified NGO access required' });
 
     const { data: listing } = await supabaseAdmin
       .from('food_listings')
       .select(`
-        listing_id, food_type, quantity_kg, pickup_address, status, is_locked, donor_id,
+        listing_id, food_type, quantity_kg, pickup_address, status, is_locked, donor_id, assigned_ngo_id, expiry_time,
         donors!inner ( donor_id, profile_id, profiles ( phone, email, full_name, organization_name ) )
       `)
       .eq('listing_id', listing_id)
@@ -59,10 +65,12 @@ router.post('/', authenticateUser, ngoOnly, async (req, res) => {
     if (!listing) {
       return res.status(404).json({ error: 'Listing not found' });
     }
-    console.log('[CLAIMS] Listing:', listing.listing_id, 'status:', listing.status, 'locked:', listing.is_locked);
-
-    if (['claimed', 'completed', 'expired'].includes(listing.status)) {
-      return res.status(400).json({ error: 'Listing is already occupied', current_status: listing.status });
+    if (listing.assigned_ngo_id && listing.assigned_ngo_id !== ngo.ngo_id) {
+      return res.status(404).json({ error: 'Listing not found' });
+    }
+    if (listing.is_locked || !['open', 'in_discussion'].includes(listing.status)
+      || new Date(listing.expiry_time).getTime() <= Date.now()) {
+      return res.status(409).json({ error: 'Listing is no longer available' });
     }
 
     const { data: rpcResult, error: rpcError } = await supabaseAdmin.rpc('claim_listing', {
@@ -73,8 +81,6 @@ router.post('/', authenticateUser, ngoOnly, async (req, res) => {
     });
 
     if (!rpcError && rpcResult && !rpcResult.error) {
-      console.log('[CLAIMS] RPC success! Claim:', rpcResult.claim_id);
-
       try {
         const donorPhone = listing.donors?.profiles?.phone;
         if (donorPhone) {
@@ -130,94 +136,13 @@ router.post('/', authenticateUser, ngoOnly, async (req, res) => {
       });
     }
 
-    const rpcMsg = rpcError?.message || rpcResult?.error || 'unknown';
-    console.log('[CLAIMS] RPC unavailable or failed:', rpcMsg, '— using fallback');
-
-    const { error: delErr } = await supabaseAdmin.from('ngo_claims').delete().eq('listing_id', listing_id);
-    if (delErr) console.error('[CLAIMS] Delete claims error:', delErr.message);
-    else console.log('[CLAIMS] Old claims deleted');
-
-    const { error: lockErr } = await supabaseAdmin
-      .from('food_listings')
-      .update({ is_locked: true, status: 'claimed' })
-      .eq('listing_id', listing_id);
-
-    if (lockErr) {
-      console.error('[CLAIMS] Lock error:', lockErr);
-      return res.status(500).json({ error: 'Failed to lock listing', message: lockErr.message });
-    }
-    console.log('[CLAIMS] Listing locked');
-
-    const { data: claim, error: claimErr } = await supabaseAdmin
-      .from('ngo_claims')
-      .insert({
-        listing_id,
-        ngo_id: ngo.ngo_id,
-        pickup_scheduled_time: pickup_scheduled_time || null,
-        strategy_notes: strategy_notes || null,
-        status: 'claimed'
-      })
-      .select()
-      .single();
-
-    if (claimErr) {
-      console.error('[CLAIMS] Insert error:', claimErr);
-      await supabaseAdmin.from('food_listings').update({ is_locked: false, status: 'open' }).eq('listing_id', listing_id);
-      return res.status(500).json({ error: 'Failed to create claim', message: claimErr.message });
-    }
-    console.log('[CLAIMS] Claim created:', claim.claim_id);
-
-    try {
-      const donorPhone = listing.donors?.profiles?.phone;
-      if (donorPhone) {
-        sendClaimAlert(donorPhone, ngo.ngo_name, listing.food_type).catch(() => { });
-      }
-    } catch (_) { }
-
-    (async () => {
-      try {
-        const { data: donorProfile } = await supabaseAdmin
-          .from('food_listings')
-          .select('donor_id, food_type, quantity_kg, pickup_address, donors(profiles(email, full_name, organization_name))')
-          .eq('listing_id', listing_id)
-          .single();
-
-        const dEmail = donorProfile?.donors?.profiles?.email;
-        if (dEmail) {
-          const { data: ngoFull } = await supabaseAdmin
-            .from('ngos')
-            .select('ngo_name, contact_person, profiles(phone)')
-            .eq('ngo_id', ngo.ngo_id)
-            .single();
-
-          sendClaimAcceptedEmail({
-            to: dEmail,
-            donorName: donorProfile.donors.profiles.organization_name || donorProfile.donors.profiles.full_name || 'Donor',
-            ngoName: ngo.ngo_name,
-            ngoContact: ngoFull?.contact_person || ngo.ngo_name,
-            ngoPhone: ngoFull?.profiles?.phone || 'N/A',
-            foodType: donorProfile.food_type,
-            quantity: String(donorProfile.quantity_kg || ''),
-            pickupAddress: donorProfile.pickup_address || 'N/A',
-            pickupTime: pickup_scheduled_time ? new Date(pickup_scheduled_time).toLocaleString() : 'To be scheduled',
-          }).catch(err => console.error('[CLAIMS] Claim email to donor (fallback) failed:', err.message));
-        }
-      } catch (emailErr) {
-        console.error('[CLAIMS] Error sending claim email (fallback):', emailErr.message);
-      }
-    })();
-
-    const delivery = await createUnassignedDelivery(claim.claim_id);
-
-    return res.status(201).json({
-      message: 'Listing claimed successfully',
-      claim,
-      delivery
-    });
+    console.error('[CLAIMS] Atomic claim failed:', rpcError?.code || 'claim rejected');
+    if (rpcResult?.error) return res.status(409).json({ error: 'Listing is no longer available' });
+    return res.status(503).json({ error: 'Listing could not be claimed right now.' });
 
   } catch (error) {
-    console.error('[CLAIMS] Unhandled error:', error);
-    res.status(500).json({ error: 'Failed to claim listing', message: error.message });
+    console.error('[CLAIMS] Unhandled error:', error.name || 'Error');
+    res.status(500).json({ error: 'Failed to claim listing' });
   }
 });
 
@@ -227,7 +152,7 @@ router.get('/my', authenticateUser, ngoOnly, async (req, res) => {
 
     const { data: ngo } = await supabaseAdmin
       .from('ngos')
-      .select('ngo_id')
+      .select('ngo_id, verification_status')
       .eq('profile_id', req.user.id)
       .single();
 
@@ -236,6 +161,7 @@ router.get('/my', authenticateUser, ngoOnly, async (req, res) => {
         error: 'NGO profile not found'
       });
     }
+    if (!ngo.verification_status) return res.status(403).json({ error: 'Verified NGO access required' });
 
     let query = supabaseAdmin
       .from('ngo_claims')
@@ -265,7 +191,7 @@ router.get('/my', authenticateUser, ngoOnly, async (req, res) => {
     if (error) {
       return res.status(500).json({
         error: 'Failed to fetch claims',
-        message: error.message
+        message: 'The request could not be completed.'
       });
     }
 
@@ -278,7 +204,7 @@ router.get('/my', authenticateUser, ngoOnly, async (req, res) => {
     console.error('Get claims error:', error);
     res.status(500).json({
       error: 'Failed to get claims',
-      message: error.message
+      message: 'The request could not be completed.'
     });
   }
 });
@@ -320,29 +246,37 @@ router.get('/:claim_id', authenticateUser, async (req, res) => {
     if (req.user.role === 'ngo') {
       const { data: ngo } = await supabaseAdmin
         .from('ngos')
-        .select('ngo_id')
+        .select('ngo_id, verification_status')
         .eq('profile_id', req.user.id)
         .single();
 
-      if (ngo && claim.ngo_id !== ngo.ngo_id) {
+      if (!ngo || !ngo.verification_status || claim.ngo_id !== ngo.ngo_id) {
         return res.status(403).json({
           error: 'Access denied'
         });
       }
-    }
-
-    if (req.user.role === 'donor') {
+    } else if (req.user.role === 'donor') {
       const { data: donor } = await supabaseAdmin
         .from('donors')
         .select('donor_id')
         .eq('profile_id', req.user.id)
         .single();
 
-      if (donor && claim.food_listings.donor_id !== donor.donor_id) {
+      if (!donor || claim.food_listings.donor_id !== donor.donor_id) {
         return res.status(403).json({
           error: 'Access denied'
         });
       }
+    } else if (req.user.role === 'volunteer') {
+      const { data: volunteer } = await supabaseAdmin
+        .from('volunteers').select('volunteer_id').eq('profile_id', req.user.id).maybeSingle();
+      if (!volunteer) return res.status(403).json({ error: 'Access denied' });
+      const { data: delivery } = await supabaseAdmin
+        .from('deliveries').select('delivery_id').eq('claim_id', claim_id)
+        .eq('volunteer_id', volunteer.volunteer_id).maybeSingle();
+      if (!delivery) return res.status(403).json({ error: 'Access denied' });
+    } else if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Access denied' });
     }
 
     res.json({
@@ -353,7 +287,7 @@ router.get('/:claim_id', authenticateUser, async (req, res) => {
     console.error('Get claim error:', error);
     res.status(500).json({
       error: 'Failed to get claim',
-      message: error.message
+      message: 'The request could not be completed.'
     });
   }
 });
@@ -365,7 +299,7 @@ router.put('/:claim_id', authenticateUser, ngoOnly, async (req, res) => {
 
     const { data: ngo } = await supabaseAdmin
       .from('ngos')
-      .select('ngo_id')
+      .select('ngo_id, verification_status')
       .eq('profile_id', req.user.id)
       .single();
 
@@ -374,10 +308,11 @@ router.put('/:claim_id', authenticateUser, ngoOnly, async (req, res) => {
         error: 'NGO profile not found'
       });
     }
+    if (!ngo.verification_status) return res.status(403).json({ error: 'Verified NGO access required' });
 
     const { data: existing } = await supabaseAdmin
       .from('ngo_claims')
-      .select('ngo_id')
+      .select('ngo_id, status')
       .eq('claim_id', claim_id)
       .single();
 
@@ -388,22 +323,38 @@ router.put('/:claim_id', authenticateUser, ngoOnly, async (req, res) => {
     }
 
     const updates = {};
-    if (pickup_scheduled_time !== undefined) updates.pickup_scheduled_time = pickup_scheduled_time;
-    if (strategy_notes !== undefined) updates.strategy_notes = strategy_notes;
-    if (status !== undefined) updates.status = status;
+    if (pickup_scheduled_time !== undefined) {
+      if (pickup_scheduled_time !== null
+        && (typeof pickup_scheduled_time !== 'string' || !Number.isFinite(Date.parse(pickup_scheduled_time)))) {
+        return res.status(400).json({ error: 'Invalid pickup schedule' });
+      }
+      updates.pickup_scheduled_time = pickup_scheduled_time;
+    }
+    if (strategy_notes !== undefined) {
+      if (strategy_notes !== null && (typeof strategy_notes !== 'string' || strategy_notes.length > 1000)) {
+        return res.status(400).json({ error: 'Invalid strategy notes' });
+      }
+      updates.strategy_notes = strategy_notes;
+    }
+    if (status !== undefined) {
+      if (!['claimed', 'scheduled'].includes(status)) {
+        return res.status(400).json({ error: 'Invalid claim status' });
+      }
+      updates.status = status;
+    }
+    if (Object.keys(updates).length === 0) return res.status(400).json({ error: 'No valid claim updates provided' });
 
     const { data: claim, error } = await supabaseAdmin
       .from('ngo_claims')
       .update(updates)
       .eq('claim_id', claim_id)
+      .eq('ngo_id', ngo.ngo_id)
+      .eq('status', existing.status)
       .select()
       .single();
 
     if (error) {
-      return res.status(500).json({
-        error: 'Failed to update claim',
-        message: error.message
-      });
+      return res.status(error.code === 'PGRST116' ? 409 : 500).json({ error: 'Failed to update claim' });
     }
 
     res.json({
@@ -415,7 +366,7 @@ router.put('/:claim_id', authenticateUser, ngoOnly, async (req, res) => {
     console.error('Update claim error:', error);
     res.status(500).json({
       error: 'Failed to update claim',
-      message: error.message
+      message: 'The request could not be completed.'
     });
   }
 });
@@ -427,7 +378,7 @@ router.delete('/:claim_id', authenticateUser, ngoOnly, async (req, res) => {
     // Get ngo_id
     const { data: ngo } = await supabaseAdmin
       .from('ngos')
-      .select('ngo_id')
+      .select('ngo_id, verification_status')
       .eq('profile_id', req.user.id)
       .single();
 
@@ -436,6 +387,15 @@ router.delete('/:claim_id', authenticateUser, ngoOnly, async (req, res) => {
         error: 'NGO profile not found'
       });
     }
+    if (!ngo.verification_status) return res.status(403).json({ error: 'Verified NGO access required' });
+
+    const { data: claim } = await supabaseAdmin
+      .from('ngo_claims')
+      .select('listing_id')
+      .eq('claim_id', claim_id)
+      .eq('ngo_id', ngo.ngo_id)
+      .maybeSingle();
+    if (!claim) return res.status(404).json({ error: 'Claim not found or access denied' });
 
     const { data: delivery } = await supabaseAdmin
       .from('deliveries')
@@ -458,15 +418,9 @@ router.delete('/:claim_id', authenticateUser, ngoOnly, async (req, res) => {
     if (error) {
       return res.status(500).json({
         error: 'Failed to cancel claim',
-        message: error.message
+        message: 'The request could not be completed.'
       });
     }
-
-    const { data: claim } = await supabaseAdmin
-      .from('ngo_claims')
-      .select('listing_id')
-      .eq('claim_id', claim_id)
-      .single();
 
     if (claim) {
       await supabaseAdmin
@@ -475,7 +429,9 @@ router.delete('/:claim_id', authenticateUser, ngoOnly, async (req, res) => {
           is_locked: false,
           status: 'open'
         })
-        .eq('listing_id', claim.listing_id);
+        .eq('listing_id', claim.listing_id)
+        .eq('status', 'claimed')
+        .eq('is_locked', true);
     }
 
     res.json({
@@ -486,7 +442,7 @@ router.delete('/:claim_id', authenticateUser, ngoOnly, async (req, res) => {
     console.error('Cancel claim error:', error);
     res.status(500).json({
       error: 'Failed to cancel claim',
-      message: error.message
+      message: 'The request could not be completed.'
     });
   }
 });

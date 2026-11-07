@@ -448,7 +448,7 @@ export const RegisterForm = forwardRef(function RegisterForm(
             return
         }
 
-        if (!oauthOnboarding && password.length < 6) {
+        if (!oauthOnboarding && password.length < 12) {
             setError(t('passwordMinLength'))
             return
         }

@@ -57,7 +57,7 @@ router.get('/donor/my', authenticateUser, donorOnly, async (req, res) => {
       `)
       .eq('ngo_claims.food_listings.donor_id', donor.donor_id)
       .order('created_at', { ascending: false });
-    if (error) return res.status(500).json({ error: 'Failed to fetch tracking data', message: error.message });
+    if (error) return res.status(500).json({ error: 'Failed to fetch tracking data', message: 'The request could not be completed.' });
 
     const freshCutoff = new Date(Date.now() - 5 * 60_000).toISOString();
     const withCandidates = await Promise.all((deliveries || []).map(async (delivery) => {
@@ -102,7 +102,7 @@ router.get('/donor/my', authenticateUser, donorOnly, async (req, res) => {
     res.json({ deliveries: withCandidates });
   } catch (error) {
     console.error('[DELIVERIES] Donor tracking feed error:', error);
-    res.status(500).json({ error: 'Failed to fetch tracking data', message: error.message });
+    res.status(500).json({ error: 'Failed to fetch tracking data', message: 'The request could not be completed.' });
   }
 });
 
@@ -128,7 +128,7 @@ router.get('/volunteer/available', authenticateUser, volunteerOnly, async (req, 
       .eq('delivery_status', 'assigned')
       .eq('ngo_claims.ngo_id', volunteer.ngo_id)
       .order('created_at', { ascending: true });
-    if (error) return res.status(500).json({ error: 'Failed to fetch available pickups', message: error.message });
+    if (error) return res.status(500).json({ error: 'Failed to fetch available pickups', message: 'The request could not be completed.' });
 
     const now = Date.now();
     const deliveries = (data || []).filter((delivery) => {
@@ -139,7 +139,7 @@ router.get('/volunteer/available', authenticateUser, volunteerOnly, async (req, 
     res.json({ deliveries, volunteer });
   } catch (error) {
     console.error('[DELIVERIES] Volunteer pickup feed error:', error);
-    res.status(500).json({ error: 'Failed to fetch available pickups', message: error.message });
+    res.status(500).json({ error: 'Failed to fetch available pickups', message: 'The request could not be completed.' });
   }
 });
 
@@ -164,12 +164,12 @@ router.get('/volunteer/history', authenticateUser, volunteerOnly, async (req, re
       .in('delivery_status', ['delivered', 'failed'])
       .order('created_at', { ascending: false })
       .limit(50);
-    if (error) return res.status(500).json({ error: 'Failed to fetch pickup history', message: error.message });
+    if (error) return res.status(500).json({ error: 'Failed to fetch pickup history', message: 'The request could not be completed.' });
 
     res.json({ deliveries: data || [] });
   } catch (error) {
     console.error('[DELIVERIES] Volunteer pickup history error:', error);
-    res.status(500).json({ error: 'Failed to fetch pickup history', message: error.message });
+    res.status(500).json({ error: 'Failed to fetch pickup history', message: 'The request could not be completed.' });
   }
 });
 
@@ -193,7 +193,7 @@ router.get('/volunteer/active', authenticateUser, volunteerOnly, async (req, res
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
-    if (error) return res.status(500).json({ error: 'Failed to fetch active pickup', message: error.message });
+    if (error) return res.status(500).json({ error: 'Failed to fetch active pickup', message: 'The request could not be completed.' });
     if (data) {
       const { data: codeRecord } = await supabaseAdmin
         .from('delivery_collection_secrets').select('delivery_id').eq('delivery_id', data.delivery_id).maybeSingle();
@@ -202,7 +202,7 @@ router.get('/volunteer/active', authenticateUser, volunteerOnly, async (req, res
     res.json({ delivery: data || null, volunteer });
   } catch (error) {
     console.error('[DELIVERIES] Volunteer active pickup error:', error);
-    res.status(500).json({ error: 'Failed to fetch active pickup', message: error.message });
+    res.status(500).json({ error: 'Failed to fetch active pickup', message: 'The request could not be completed.' });
   }
 });
 
@@ -235,7 +235,7 @@ router.post('/:delivery_id/cancel', authenticateUser, volunteerOnly, async (req,
     console.error('[DELIVERIES] Volunteer cancel pickup error:', error);
     const response = trackingErrorResponse(error, res);
     if (response) return response;
-    res.status(500).json({ error: 'Failed to cancel pickup', message: error.message });
+    res.status(500).json({ error: 'Failed to cancel pickup', message: 'The request could not be completed.' });
   }
 });
 
@@ -266,7 +266,7 @@ router.post('/volunteer/availability-location', authenticateUser, volunteerOnly,
     res.json({ location: data });
   } catch (error) {
     console.error('[DELIVERIES] Volunteer availability location error:', error);
-    res.status(500).json({ error: 'Failed to update availability location', message: error.message });
+    res.status(500).json({ error: 'Failed to update availability location', message: 'The request could not be completed.' });
   }
 });
 
@@ -308,7 +308,7 @@ router.put('/volunteer/availability', authenticateUser, volunteerOnly, async (re
     res.json({ volunteer: data });
   } catch (error) {
     console.error('[DELIVERIES] Volunteer availability update error:', error);
-    res.status(500).json({ error: 'Failed to update volunteer availability', message: error.message });
+    res.status(500).json({ error: 'Failed to update volunteer availability', message: 'The request could not be completed.' });
   }
 });
 
@@ -331,7 +331,7 @@ router.delete('/volunteer/availability-location', authenticateUser, volunteerOnl
     res.json({ message: 'Availability location cleared' });
   } catch (error) {
     console.error('[DELIVERIES] Clear volunteer availability location error:', error);
-    res.status(500).json({ error: 'Failed to clear availability location', message: error.message });
+    res.status(500).json({ error: 'Failed to clear availability location', message: 'The request could not be completed.' });
   }
 });
 
@@ -400,7 +400,7 @@ router.post('/:delivery_id/accept', authenticateUser, volunteerOnly, async (req,
     console.error('[DELIVERIES] Volunteer accept error:', error);
     const response = trackingErrorResponse(error, res);
     if (response) return response;
-    res.status(500).json({ error: 'Failed to accept pickup', message: error.message });
+    res.status(500).json({ error: 'Failed to accept pickup', message: 'The request could not be completed.' });
   }
 });
 
@@ -440,11 +440,11 @@ router.post('/:delivery_id/location', authenticateUser, volunteerOnly, async (re
       .eq('volunteer_id', volunteer.volunteer_id)
       .select('delivery_id, location_latitude, location_longitude, location_updated_at')
       .single();
-    if (error) return res.status(500).json({ error: 'Failed to update location', message: error.message });
+    if (error) return res.status(500).json({ error: 'Failed to update location', message: 'The request could not be completed.' });
     res.json({ location: updated });
   } catch (error) {
     console.error('[DELIVERIES] Volunteer location update error:', error);
-    res.status(500).json({ error: 'Failed to update location', message: error.message });
+    res.status(500).json({ error: 'Failed to update location', message: 'The request could not be completed.' });
   }
 });
 
@@ -490,7 +490,7 @@ router.post('/:delivery_id/verify-otp', authenticateUser, volunteerOnly, async (
     console.error('[DELIVERIES] OTP verification error:', error);
     const response = trackingErrorResponse(error, res);
     if (response) return response;
-    res.status(500).json({ error: 'Failed to verify pickup', message: error.message });
+    res.status(500).json({ error: 'Failed to verify pickup', message: 'The request could not be completed.' });
   }
 });
 
@@ -553,7 +553,7 @@ router.post('/:delivery_id/resend-code', authenticateUser, donorOnly, async (req
     console.error('[DELIVERIES] Collection code resend error:', error);
     const response = trackingErrorResponse(error, res);
     if (response) return response;
-    res.status(500).json({ error: 'Failed to resend pickup code', message: error.message });
+    res.status(500).json({ error: 'Failed to resend pickup code', message: 'The request could not be completed.' });
   }
 });
 
@@ -561,15 +561,15 @@ router.post('/', authenticateUser, ngoOnly, async (req, res) => {
   try {
     const { claim_id, volunteer_id } = req.body;
 
-    if (!claim_id) {
-      return res.status(400).json({
-        error: 'Missing required field: claim_id'
-      });
+    if (typeof claim_id !== 'string' || !/^[0-9a-f-]{36}$/i.test(claim_id)
+      || (volunteer_id !== undefined && volunteer_id !== null
+        && (typeof volunteer_id !== 'string' || !/^[0-9a-f-]{36}$/i.test(volunteer_id)))) {
+      return res.status(400).json({ error: 'Invalid claim or volunteer id' });
     }
 
     const { data: ngo } = await supabaseAdmin
       .from('ngos')
-      .select('ngo_id, ngo_name')
+      .select('ngo_id, ngo_name, verification_status')
       .eq('profile_id', req.user.id)
       .single();
 
@@ -578,6 +578,7 @@ router.post('/', authenticateUser, ngoOnly, async (req, res) => {
         error: 'NGO profile not found'
       });
     }
+    if (!ngo.verification_status) return res.status(403).json({ error: 'Verified NGO access required' });
 
     const { data: claim } = await supabaseAdmin
       .from('ngo_claims')
@@ -604,6 +605,7 @@ router.post('/', authenticateUser, ngoOnly, async (req, res) => {
       });
     }
 
+    let reservedVolunteer = null;
     if (volunteer_id) {
       const { data: volunteer } = await supabaseAdmin
         .from('volunteers')
@@ -624,6 +626,24 @@ router.post('/', authenticateUser, ngoOnly, async (req, res) => {
         });
       }
       if (!volunteer.availability_status) return res.status(409).json({ error: 'Volunteer unavailable' });
+
+      const { data: activeDelivery } = await supabaseAdmin
+        .from('deliveries').select('delivery_id').eq('volunteer_id', volunteer_id)
+        .in('delivery_status', ['assigned', 'in_transit']).limit(1).maybeSingle();
+      if (activeDelivery) return res.status(409).json({ error: 'Volunteer already has an active pickup' });
+
+      const { data: reserved, error: reserveError } = await supabaseAdmin
+        .from('volunteers')
+        .update({ availability_status: false })
+        .eq('volunteer_id', volunteer_id)
+        .eq('ngo_id', ngo.ngo_id)
+        .eq('availability_status', true)
+        .is('profile_id', null)
+        .select('volunteer_id')
+        .maybeSingle();
+      if (reserveError) throw reserveError;
+      if (!reserved) return res.status(409).json({ error: 'Volunteer unavailable' });
+      reservedVolunteer = reserved;
     }
 
     const { data: delivery, error } = await supabaseAdmin
@@ -638,16 +658,20 @@ router.post('/', authenticateUser, ngoOnly, async (req, res) => {
       .single();
 
     if (error) {
+      if (reservedVolunteer) {
+        await supabaseAdmin.from('volunteers')
+          .update({ availability_status: true })
+          .eq('volunteer_id', reservedVolunteer.volunteer_id)
+          .eq('ngo_id', ngo.ngo_id);
+      }
+      if (error.code === '23505') return res.status(409).json({ error: 'A delivery already exists for this claim.' });
       return res.status(500).json({
         error: 'Failed to create delivery',
-        message: error.message
+        message: 'The request could not be completed.'
       });
     }
 
     if (volunteer_id) {
-      await supabaseAdmin.from('volunteers')
-        .update({ availability_status: false })
-        .eq('volunteer_id', volunteer_id);
       const { data: volunteer } = await supabaseAdmin
         .from('volunteers')
         .select('full_name, phone')
@@ -710,7 +734,7 @@ router.post('/', authenticateUser, ngoOnly, async (req, res) => {
     console.error('Create delivery error:', error);
     res.status(500).json({
       error: 'Failed to create delivery',
-      message: error.message
+      message: 'The request could not be completed.'
     });
   }
 });
@@ -721,7 +745,7 @@ router.get('/my', authenticateUser, ngoOnly, async (req, res) => {
 
     const { data: ngo } = await supabaseAdmin
       .from('ngos')
-      .select('ngo_id')
+      .select('ngo_id, verification_status')
       .eq('profile_id', req.user.id)
       .single();
 
@@ -730,6 +754,7 @@ router.get('/my', authenticateUser, ngoOnly, async (req, res) => {
         error: 'NGO profile not found'
       });
     }
+    if (!ngo.verification_status) return res.status(403).json({ error: 'Verified NGO access required' });
 
     let query = supabaseAdmin
       .from('deliveries')
@@ -772,7 +797,7 @@ router.get('/my', authenticateUser, ngoOnly, async (req, res) => {
     if (error) {
       return res.status(500).json({
         error: 'Failed to fetch deliveries',
-        message: error.message
+        message: 'The request could not be completed.'
       });
     }
 
@@ -785,7 +810,7 @@ router.get('/my', authenticateUser, ngoOnly, async (req, res) => {
     console.error('Get deliveries error:', error);
     res.status(500).json({
       error: 'Failed to get deliveries',
-      message: error.message
+      message: 'The request could not be completed.'
     });
   }
 });
@@ -830,8 +855,8 @@ router.get('/:delivery_id', authenticateUser, async (req, res) => {
     }
 
     if (req.user.role === 'ngo') {
-      const { data: ngo } = await supabaseAdmin.from('ngos').select('ngo_id').eq('profile_id', req.user.id).maybeSingle();
-      if (!ngo || ngo.ngo_id !== delivery.ngo_claims?.ngo_id) return res.status(403).json({ error: 'Access denied' });
+      const { data: ngo } = await supabaseAdmin.from('ngos').select('ngo_id, verification_status').eq('profile_id', req.user.id).maybeSingle();
+      if (!ngo || !ngo.verification_status || ngo.ngo_id !== delivery.ngo_claims?.ngo_id) return res.status(403).json({ error: 'Access denied' });
     } else if (req.user.role === 'donor') {
       const { data: donor } = await supabaseAdmin.from('donors').select('donor_id').eq('profile_id', req.user.id).maybeSingle();
       if (!donor || donor.donor_id !== delivery.ngo_claims?.food_listings?.donor_id) return res.status(403).json({ error: 'Access denied' });
@@ -850,7 +875,7 @@ router.get('/:delivery_id', authenticateUser, async (req, res) => {
     console.error('Get delivery error:', error);
     res.status(500).json({
       error: 'Failed to get delivery',
-      message: error.message
+      message: 'The request could not be completed.'
     });
   }
 });
@@ -858,7 +883,7 @@ router.get('/:delivery_id', authenticateUser, async (req, res) => {
 router.put('/:delivery_id/status', authenticateUser, ngoOnly, async (req, res) => {
   try {
     const { delivery_id } = req.params;
-    const { status, pickup_time, delivery_time, proof_image_url } = req.body;
+    const { status, proof_image_url } = req.body;
 
     if (!status) {
       return res.status(400).json({
@@ -866,7 +891,7 @@ router.put('/:delivery_id/status', authenticateUser, ngoOnly, async (req, res) =
       });
     }
 
-    const validStatuses = ['assigned', 'in_transit', 'delivered', 'failed'];
+    const validStatuses = ['in_transit', 'delivered', 'failed'];
     if (!validStatuses.includes(status)) {
       return res.status(400).json({
         error: 'Invalid status',
@@ -876,7 +901,7 @@ router.put('/:delivery_id/status', authenticateUser, ngoOnly, async (req, res) =
 
     const { data: ngo } = await supabaseAdmin
       .from('ngos')
-      .select('ngo_id')
+      .select('ngo_id, verification_status')
       .eq('profile_id', req.user.id)
       .single();
 
@@ -885,12 +910,15 @@ router.put('/:delivery_id/status', authenticateUser, ngoOnly, async (req, res) =
         error: 'NGO profile not found'
       });
     }
+    if (!ngo.verification_status) return res.status(403).json({ error: 'Verified NGO access required' });
 
     const { data: existingDelivery } = await supabaseAdmin
       .from('deliveries')
       .select(`
         delivery_id,
         delivery_status,
+        volunteer_id,
+        volunteers(profile_id),
         ngo_claims!inner (
           ngo_id,
           food_listings (
@@ -910,24 +938,57 @@ router.put('/:delivery_id/status', authenticateUser, ngoOnly, async (req, res) =
       });
     }
 
-    if (status === 'delivered' && existingDelivery.delivery_status === 'delivered') {
+    const allowedTransitions = {
+      assigned: ['in_transit', 'failed'],
+      in_transit: ['delivered', 'failed'],
+      failed: [],
+      delivered: []
+    };
+    if (status === existingDelivery.delivery_status && status === 'delivered') {
       const { data: currentDelivery } = await supabaseAdmin
         .from('deliveries').select('*').eq('delivery_id', delivery_id).single();
       return res.json({ message: 'Delivery is already complete', delivery: currentDelivery });
     }
+    if (!allowedTransitions[existingDelivery.delivery_status]?.includes(status)) {
+      return res.status(409).json({ error: 'Invalid delivery state transition' });
+    }
+
+    if (proof_image_url !== undefined && proof_image_url !== null && proof_image_url !== '') {
+      if (typeof proof_image_url !== 'string' || proof_image_url.length > 2048) {
+        return res.status(400).json({ error: 'Invalid proof image URL' });
+      }
+      try {
+        const proofUrl = new URL(proof_image_url);
+        if (proofUrl.protocol !== 'https:' || proofUrl.username || proofUrl.password) {
+          return res.status(400).json({ error: 'Proof image URL must use HTTPS' });
+        }
+      } catch (_) {
+        return res.status(400).json({ error: 'Invalid proof image URL' });
+      }
+    }
 
     if (['in_transit', 'delivered'].includes(status)) {
-      const { data: collectionSecret, error: secretError } = await supabaseAdmin
-        .from('delivery_collection_secrets')
-        .select('verified_at')
-        .eq('delivery_id', delivery_id)
-        .maybeSingle();
-      if (secretError && secretError.code !== '42P01' && secretError.code !== 'PGRST205') throw secretError;
-      if (collectionSecret && !collectionSecret.verified_at) {
-        return res.status(409).json({
-          error: 'Collection verification required',
-          message: 'The assigned volunteer must verify the donor pickup code before this delivery can proceed.'
-        });
+      if (!existingDelivery.volunteer_id) {
+        return res.status(409).json({ error: 'Assign a volunteer before progressing this delivery.' });
+      }
+      const assignedVolunteer = one(existingDelivery.volunteers);
+      if (assignedVolunteer?.profile_id) {
+        const { data: collectionSecret, error: secretError } = await supabaseAdmin
+          .from('delivery_collection_secrets')
+          .select('verified_at')
+          .eq('delivery_id', delivery_id)
+          .maybeSingle();
+        if (secretError) {
+          const response = trackingErrorResponse(secretError, res);
+          if (response) return response;
+          throw secretError;
+        }
+        if (!collectionSecret?.verified_at) {
+          return res.status(409).json({
+            error: 'Collection verification required',
+            message: 'The assigned volunteer must verify the donor pickup code before this delivery can proceed.'
+          });
+        }
       }
     }
 
@@ -935,14 +996,12 @@ router.put('/:delivery_id/status', authenticateUser, ngoOnly, async (req, res) =
       delivery_status: status
     };
 
-    if (pickup_time) updates.pickup_time = pickup_time;
-    if (delivery_time) updates.delivery_time = delivery_time;
     if (proof_image_url) updates.proof_image_url = proof_image_url;
 
-    if (status === 'in_transit' && !pickup_time) {
+    if (status === 'in_transit') {
       updates.pickup_time = new Date().toISOString();
     }
-    if (status === 'delivered' && !delivery_time) {
+    if (status === 'delivered') {
       updates.delivery_time = new Date().toISOString();
     }
 
@@ -957,7 +1016,7 @@ router.put('/:delivery_id/status', authenticateUser, ngoOnly, async (req, res) =
     if (error) {
       return res.status(error.code === 'PGRST116' ? 409 : 500).json({
         error: 'Failed to update delivery status',
-        message: error.code === 'PGRST116' ? 'The delivery status changed. Refresh before trying again.' : error.message
+        message: error.code === 'PGRST116' ? 'The delivery status changed. Refresh before trying again.' : 'The request could not be completed.'
       });
     }
 
@@ -1063,25 +1122,28 @@ router.put('/:delivery_id/status', authenticateUser, ngoOnly, async (req, res) =
     console.error('Update delivery status error:', error);
     res.status(500).json({
       error: 'Failed to update delivery status',
-      message: error.message
+      message: 'The request could not be completed.'
     });
   }
 });
 
 router.put('/:delivery_id/assign', authenticateUser, ngoOnly, async (req, res) => {
+  let reservationId = null;
+  let reservationNgoId = null;
   try {
     const { delivery_id } = req.params;
     const { volunteer_id } = req.body;
 
-    if (!volunteer_id) {
+    const isUuid = (value) => typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+    if (!isUuid(delivery_id) || !isUuid(volunteer_id)) {
       return res.status(400).json({
-        error: 'Missing required field: volunteer_id'
+        error: 'Invalid delivery or volunteer id'
       });
     }
 
     const { data: ngo } = await supabaseAdmin
       .from('ngos')
-      .select('ngo_id')
+      .select('ngo_id, verification_status')
       .eq('profile_id', req.user.id)
       .single();
 
@@ -1090,6 +1152,7 @@ router.put('/:delivery_id/assign', authenticateUser, ngoOnly, async (req, res) =
         error: 'NGO profile not found'
       });
     }
+    if (!ngo.verification_status) return res.status(403).json({ error: 'Verified NGO access required' });
 
     const { data: volunteer } = await supabaseAdmin
       .from('volunteers')
@@ -1118,11 +1181,35 @@ router.put('/:delivery_id/assign', authenticateUser, ngoOnly, async (req, res) =
       .eq('ngo_claims.ngo_id', ngo.ngo_id)
       .maybeSingle();
     if (currentError || !currentDelivery) return res.status(404).json({ error: 'Delivery not found or access denied' });
-    if (!['assigned', 'in_transit'].includes(currentDelivery.delivery_status)) {
+    if (currentDelivery.delivery_status !== 'assigned') {
       return res.status(409).json({ error: 'Delivery is no longer active' });
     }
-    if (!volunteer.availability_status && currentDelivery.volunteer_id !== volunteer_id) {
-      return res.status(409).json({ error: 'Volunteer unavailable' });
+
+    const changingVolunteer = currentDelivery.volunteer_id !== volunteer_id;
+    let reservedVolunteer = false;
+    if (changingVolunteer) {
+      const { data: activeDelivery, error: activeError } = await supabaseAdmin
+        .from('deliveries').select('delivery_id')
+        .eq('volunteer_id', volunteer_id)
+        .in('delivery_status', ['assigned', 'in_transit'])
+        .limit(1).maybeSingle();
+      if (activeError) throw activeError;
+      if (activeDelivery) return res.status(409).json({ error: 'Volunteer already has an active pickup' });
+
+      const { data: reserved, error: reserveError } = await supabaseAdmin
+        .from('volunteers')
+        .update({ availability_status: false })
+        .eq('volunteer_id', volunteer_id)
+        .eq('ngo_id', ngo.ngo_id)
+        .eq('availability_status', true)
+        .is('profile_id', null)
+        .select('volunteer_id')
+        .maybeSingle();
+      if (reserveError) throw reserveError;
+      if (!reserved) return res.status(409).json({ error: 'Volunteer unavailable' });
+      reservedVolunteer = true;
+      reservationId = volunteer_id;
+      reservationNgoId = ngo.ngo_id;
     }
 
     let assignmentQuery = supabaseAdmin
@@ -1139,20 +1226,36 @@ router.put('/:delivery_id/assign', authenticateUser, ngoOnly, async (req, res) =
     const { data: delivery, error } = await assignmentQuery.select().single();
 
     if (error) {
+      if (reservedVolunteer) {
+        await supabaseAdmin.from('volunteers')
+          .update({ availability_status: true })
+          .eq('volunteer_id', volunteer_id)
+          .eq('ngo_id', ngo.ngo_id);
+        reservationId = null;
+        reservationNgoId = null;
+      }
       return res.status(error.code === 'PGRST116' ? 409 : 500).json({
         error: 'Failed to reassign volunteer',
-        message: error.code === 'PGRST116' ? 'The delivery assignment changed. Refresh and try again.' : error.message
+        message: error.code === 'PGRST116' ? 'The delivery assignment changed. Refresh and try again.' : 'The request could not be completed.'
       });
     }
 
-    if (currentDelivery.volunteer_id && currentDelivery.volunteer_id !== volunteer_id) {
-      await supabaseAdmin.from('volunteers')
-        .update({ availability_status: true })
-        .eq('volunteer_id', currentDelivery.volunteer_id);
+    if (currentDelivery.volunteer_id && changingVolunteer) {
+      const { data: otherActiveDelivery } = await supabaseAdmin
+        .from('deliveries').select('delivery_id')
+        .eq('volunteer_id', currentDelivery.volunteer_id)
+        .in('delivery_status', ['assigned', 'in_transit'])
+        .neq('delivery_id', delivery_id)
+        .limit(1).maybeSingle();
+      if (!otherActiveDelivery) {
+        await supabaseAdmin.from('volunteers')
+          .update({ availability_status: true })
+          .eq('volunteer_id', currentDelivery.volunteer_id)
+          .eq('ngo_id', ngo.ngo_id);
+      }
     }
-    await supabaseAdmin.from('volunteers')
-      .update({ availability_status: false })
-      .eq('volunteer_id', volunteer_id);
+    reservationId = null;
+    reservationNgoId = null;
 
     res.json({
       message: 'Volunteer reassigned successfully',
@@ -1161,9 +1264,15 @@ router.put('/:delivery_id/assign', authenticateUser, ngoOnly, async (req, res) =
 
   } catch (error) {
     console.error('Reassign volunteer error:', error);
+    if (reservationId && reservationNgoId) {
+      await supabaseAdmin.from('volunteers')
+        .update({ availability_status: true })
+        .eq('volunteer_id', reservationId)
+        .eq('ngo_id', reservationNgoId);
+    }
     res.status(500).json({
       error: 'Failed to reassign volunteer',
-      message: error.message
+      message: 'The request could not be completed.'
     });
   }
 });

@@ -14,13 +14,11 @@ import AlertCenter from './AlertCenter'
 import { CarbonWallet } from '../components/CarbonWallet'
 import {
     getCurrentUser,
-    getDashboardSummary,
     getTotalImpact,
     getAllNGOs,
     getAllDonors,
     getAllListings,
     getVolunteerPerformance,
-    getDailyTrend,
     getAdminImpactOverview,
 } from '../lib/adminApi'
 import './AdminStyles.css'
@@ -44,14 +42,12 @@ export default function AdminDashboard() {
     const [error, setError] = useState(null)
 
     /* ── Data state ── */
-    const [dashboardSummary, setDashboardSummary] = useState(null)
     const [totalImpact, setTotalImpact] = useState(null)
     const [adminImpactOverview, setAdminImpactOverview] = useState(null)
     const [ngos, setNgos] = useState([])
     const [donors, setDonors] = useState([])
     const [listings, setListings] = useState([])
     const [volunteers, setVolunteers] = useState([])
-    const [trend, setTrend] = useState([])
     const [alerts, setAlerts] = useState([])
     const [activityFeed, setActivityFeed] = useState([])
 
@@ -73,7 +69,9 @@ export default function AdminDashboard() {
             feed.push({
                 id: `ngo-${n.ngo_id}`,
                 type: 'ngo',
-                message: `<strong>${n.ngo_name || 'NGO'}</strong> registered from ${n.city || 'Unknown'}`,
+                prefix: '',
+                subject: n.ngo_name || 'NGO',
+                suffix: ` registered from ${n.city || 'Unknown'}`,
                 time: new Date(n.created_at || now - i * 600000),
             })
         })
@@ -82,7 +80,9 @@ export default function AdminDashboard() {
             feed.push({
                 id: `listing-${l.listing_id}`,
                 type: 'donation',
-                message: `New donation: <strong>${l.food_type || 'Food'}</strong> — ${l.quantity_kg || 0} kg`,
+                prefix: 'New donation: ',
+                subject: l.food_type || 'Food',
+                suffix: ` — ${l.quantity_kg || 0} kg`,
                 time: new Date(l.created_at || now - i * 300000),
             })
         })
@@ -91,7 +91,9 @@ export default function AdminDashboard() {
             feed.push({
                 id: `donor-${d.donor_id}`,
                 type: 'pickup',
-                message: `<strong>${d.profiles?.organization_name || 'Donor'}</strong> joined from ${d.city || 'Unknown'}`,
+                prefix: '',
+                subject: d.profiles?.organization_name || 'Donor',
+                suffix: ` joined from ${d.city || 'Unknown'}`,
                 time: new Date(d.created_at || now - i * 900000),
             })
         })
@@ -107,20 +109,17 @@ export default function AdminDashboard() {
 
             const results = await Promise.allSettled([
                 getCurrentUser(),
-                getDashboardSummary(),
                 getTotalImpact(),
                 getAdminImpactOverview(),
                 getAllNGOs(),
                 getAllDonors(),
                 getAllListings(),
                 getVolunteerPerformance(),
-                getDailyTrend(30),
             ])
 
-            const [userRes, summaryRes, impactRes, overviewRes, ngosRes, donorsRes, listingsRes, volRes, trendRes] = results
+            const [userRes, impactRes, overviewRes, ngosRes, donorsRes, listingsRes, volRes] = results
 
             if (userRes.status === 'fulfilled') setUser(userRes.value?.user || null)
-            if (summaryRes.status === 'fulfilled') setDashboardSummary(summaryRes.value?.summary || null)
             if (impactRes.status === 'fulfilled') setTotalImpact(impactRes.value?.metrics || null)
             if (overviewRes.status === 'fulfilled') setAdminImpactOverview(overviewRes.value || null)
 
@@ -133,7 +132,6 @@ export default function AdminDashboard() {
             setListings(listingsList)
 
             if (volRes.status === 'fulfilled') setVolunteers(volRes.value?.performance || [])
-            if (trendRes.status === 'fulfilled') setTrend(trendRes.value?.trend || [])
 
             setActivityFeed(generateActivityFeed(ngosList, donorsList, listingsList))
             
@@ -150,7 +148,7 @@ export default function AdminDashboard() {
         } finally {
             if (isInitial) setLoading(false)
         }
-    }, [user, generateActivityFeed])
+    }, [generateActivityFeed])
 
     /* ── Initial load ── */
     useEffect(() => {

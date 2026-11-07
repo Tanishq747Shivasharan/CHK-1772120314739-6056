@@ -3,8 +3,37 @@ const router = express.Router();
 const { supabase, supabaseAdmin } = require('../config/supabaseClient');
 const { authenticateUser } = require('../middleware/authMiddleware');
 const { sendWelcomeDonor, sendWelcomeNGO } = require('../services/emailService');
+const { createRateLimiter } = require('../middleware/rateLimit');
 
-router.post('/oauth/profile', async (req, res) => {
+const loginLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: 'Too many login attempts. Please try again later.'
+});
+const registrationLimiter = createRateLimiter({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  message: 'Too many registration attempts. Please try again later.'
+});
+const oauthProfileLimiter = createRateLimiter({
+  windowMs: 60 * 60 * 1000,
+  max: 10,
+  message: 'Too many profile setup attempts. Please try again later.'
+});
+const refreshLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 60,
+  message: 'Too many token refresh attempts. Please sign in again later.'
+});
+
+const validEmail = (value) => typeof value === 'string'
+  && value.length <= 254
+  && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+const validText = (value, maxLength) => typeof value === 'string'
+  && value.trim().length > 0
+  && value.trim().length <= maxLength;
+
+router.post('/oauth/profile', oauthProfileLimiter, async (req, res) => {
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -39,10 +68,10 @@ router.post('/oauth/profile', async (req, res) => {
       ? organization_name.trim()
       : null;
 
-    if (!normalizedName || !normalizedPhone) {
+    if (!validText(normalizedName, 120) || !validText(normalizedPhone, 32)) {
       return res.status(400).json({
-        error: 'Missing required fields',
-        required: ['full_name', 'phone']
+        error: 'Invalid profile details',
+        message: 'Enter a name and phone number within the allowed lengths.'
       });
     }
 
@@ -60,7 +89,7 @@ router.post('/oauth/profile', async (req, res) => {
       });
     }
 
-    if (['donor', 'ngo'].includes(role) && !normalizedOrganization) {
+    if (['donor', 'ngo'].includes(role) && !validText(normalizedOrganization, 160)) {
       return res.status(400).json({
         error: 'Missing required fields',
         message: 'organization_name is required for donor and ngo roles'
@@ -119,8 +148,8 @@ router.post('/oauth/profile', async (req, res) => {
         }
 
         return res.status(409).json({
-          error: 'Profile already exists',
-          message: 'This email address or phone number is already associated with an account.'
+          error: 'Profile could not be created',
+          message: 'The supplied account details could not be used.'
         });
       }
 
@@ -135,12 +164,12 @@ router.post('/oauth/profile', async (req, res) => {
     console.error('OAuth profile creation error:', error);
     return res.status(500).json({
       error: 'Profile creation failed',
-      message: error.message
+      message: 'The profile could not be created.'
     });
   }
 });
 
-router.post('/register', async (req, res) => {
+router.post('/register', registrationLimiter, async (req, res) => {
   try {
     const {
       full_name,
@@ -149,14 +178,14 @@ router.post('/register', async (req, res) => {
       phone,
       role,
       organization_name,
-      accepted_terms,
-      accepted_terms_timestamp
+      accepted_terms
     } = req.body;
 
-    if (!full_name || !email || !password || !phone || !role) {
+    if (!validText(full_name, 120) || !validEmail(email) || typeof password !== 'string'
+      || password.length < 12 || password.length > 128 || !validText(phone, 32) || !role) {
       return res.status(400).json({
-        error: 'Missing required fields',
-        required: ['full_name', 'email', 'password', 'phone', 'role']
+        error: 'Invalid registration details',
+        message: 'Check the name, email, password, and phone number and try again.'
       });
     }
 
@@ -167,7 +196,7 @@ router.post('/register', async (req, res) => {
       });
     }
 
-    if (['donor', 'ngo'].includes(role) && !organization_name) {
+    if (['donor', 'ngo'].includes(role) && !validText(organization_name, 160)) {
       return res.status(400).json({
         error: 'Missing required fields',
         message: 'organization_name is required for donor and ngo roles'
@@ -181,8 +210,13 @@ router.post('/register', async (req, res) => {
       });
     }
 
+    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedPhone = phone.trim();
+    const normalizedName = full_name.trim();
+    const normalizedOrganization = typeof organization_name === 'string' ? organization_name.trim() : null;
+
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-      email,
+      email: normalizedEmail,
       password,
       email_confirm: true
     });
@@ -190,7 +224,7 @@ router.post('/register', async (req, res) => {
     if (authError) {
       return res.status(400).json({
         error: 'Registration failed',
-        message: authError.message
+        message: 'Registration could not be completed with these details.'
       });
     }
 
@@ -198,13 +232,13 @@ router.post('/register', async (req, res) => {
       .from('profiles')
       .insert({
         id: authData.user.id,
-        full_name,
-        email,
-        phone,
+        full_name: normalizedName,
+        email: normalizedEmail,
+        phone: normalizedPhone,
         role,
-        organization_name: organization_name || null,
+        organization_name: normalizedOrganization || null,
         accepted_terms: true,
-        accepted_terms_timestamp: accepted_terms_timestamp || new Date().toISOString()
+        accepted_terms_timestamp: new Date().toISOString()
       })
       .select()
       .single();
@@ -214,29 +248,29 @@ router.post('/register', async (req, res) => {
 
       return res.status(500).json({
         error: 'Profile creation failed',
-        message: profileError.message
+        message: 'Registration could not be completed with these details.'
       });
     }
 
     const { data: sessionData, error: sessionError } = await supabase.auth.signInWithPassword({
-      email,
+      email: normalizedEmail,
       password
     });
 
     if (sessionError) {
       return res.status(500).json({
         error: 'Session creation failed',
-        message: sessionError.message
+        message: 'The request could not be completed.'
       });
     }
 
     try {
       const emailPayload = {
-        to: email,
-        userName: full_name,
-        email,
-        phone,
-        organizationName: organization_name || 'N/A',
+        to: normalizedEmail,
+        userName: normalizedName,
+        email: normalizedEmail,
+        phone: normalizedPhone,
+        organizationName: normalizedOrganization || 'N/A',
       };
 
       if (role === 'donor') {
@@ -263,34 +297,34 @@ router.post('/register', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Registration error:', error);
+    console.error('Registration error:', error.name || 'Error');
     res.status(500).json({
       error: 'Registration failed',
-      message: error.message
+      message: 'Registration could not be completed.'
     });
   }
 });
 
-router.post('/login', async (req, res) => {
+router.post('/login', loginLimiter, async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    if (!email || !password) {
+    if (!validEmail(email) || typeof password !== 'string' || password.length === 0 || password.length > 128) {
       return res.status(400).json({
-        error: 'Missing credentials',
-        required: ['email', 'password']
+        error: 'Invalid credentials',
+        message: 'Enter a valid email address and password.'
       });
     }
 
     const { data, error } = await supabase.auth.signInWithPassword({
-      email,
+      email: email.trim().toLowerCase(),
       password
     });
 
     if (error) {
       return res.status(401).json({
         error: 'Login failed',
-        message: error.message
+        message: 'Email or password is incorrect.'
       });
     }
 
@@ -303,7 +337,7 @@ router.post('/login', async (req, res) => {
     if (profileError) {
       return res.status(404).json({
         error: 'Profile not found',
-        message: profileError.message
+        message: 'The account profile is unavailable.'
       });
     }
 
@@ -322,10 +356,10 @@ router.post('/login', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Login error:', error);
+    console.error('Login error:', error.name || 'Error');
     res.status(500).json({
       error: 'Login failed',
-      message: error.message
+      message: 'Login could not be completed.'
     });
   }
 });
@@ -340,7 +374,7 @@ router.post('/logout', authenticateUser, async (req, res) => {
     if (error) {
       return res.status(500).json({
         error: 'Logout failed',
-        message: error.message
+        message: 'The request could not be completed.'
       });
     }
 
@@ -352,16 +386,16 @@ router.post('/logout', authenticateUser, async (req, res) => {
     console.error('Logout error:', error);
     res.status(500).json({
       error: 'Logout failed',
-      message: error.message
+      message: 'The request could not be completed.'
     });
   }
 });
 
-router.post('/refresh', async (req, res) => {
+router.post('/refresh', refreshLimiter, async (req, res) => {
   try {
     const { refresh_token } = req.body;
 
-    if (!refresh_token) {
+    if (typeof refresh_token !== 'string' || refresh_token.length < 20 || refresh_token.length > 4096) {
       return res.status(400).json({
         error: 'Missing refresh token'
       });
@@ -374,7 +408,7 @@ router.post('/refresh', async (req, res) => {
     if (error) {
       return res.status(401).json({
         error: 'Token refresh failed',
-        message: error.message
+        message: 'The refresh token is invalid or expired.'
       });
     }
 
@@ -388,10 +422,10 @@ router.post('/refresh', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Token refresh error:', error);
+    console.error('Token refresh error:', error.name || 'Error');
     res.status(500).json({
       error: 'Token refresh failed',
-      message: error.message
+      message: 'The token could not be refreshed.'
     });
   }
 });
@@ -405,7 +439,7 @@ router.get('/me', authenticateUser, async (req, res) => {
     console.error('Get profile error:', error);
     res.status(500).json({
       error: 'Failed to get profile',
-      message: error.message
+      message: 'The request could not be completed.'
     });
   }
 });
