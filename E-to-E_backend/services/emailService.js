@@ -231,6 +231,34 @@ const sendCollectionOtpEmail = async ({ to, code, donorName, foodType, ngoName, 
   });
 };
 
+const sendEmailVerification = async ({ to, userName, verificationUrl }) => {
+  const html = loadTemplate('emailVerification.html', {
+    userName: userName || 'there',
+    verificationUrl,
+    supportEmail: process.env.EMAIL_USER || 'support@extratoessential.com',
+  });
+
+  return sendEmail({
+    to,
+    subject: 'Verify Your Email — Extra-to-Essential',
+    html,
+  });
+};
+
+const sendPasswordReset = async ({ to, userName, resetUrl }) => {
+  const html = loadTemplate('passwordReset.html', {
+    userName: userName || 'there',
+    resetUrl,
+    supportEmail: process.env.EMAIL_USER || 'support@extratoessential.com',
+  });
+
+  return sendEmail({
+    to,
+    subject: 'Reset Your Password — Extra-to-Essential',
+    html,
+  });
+};
+
 module.exports = {
   sendEmail,
   loadTemplate,
@@ -241,4 +269,6 @@ module.exports = {
   sendDeliveryAssignedEmail,
   sendDeliveryCompletedEmail,
   sendCollectionOtpEmail,
+  sendEmailVerification,
+  sendPasswordReset,
 };

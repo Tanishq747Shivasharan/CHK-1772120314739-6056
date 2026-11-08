@@ -2,8 +2,9 @@ const express = require('express');
 const router = express.Router();
 const { supabase, supabaseAdmin } = require('../config/supabaseClient');
 const { authenticateUser } = require('../middleware/authMiddleware');
-const { sendWelcomeDonor, sendWelcomeNGO } = require('../services/emailService');
+const { sendWelcomeDonor, sendWelcomeNGO, sendEmailVerification, sendPasswordReset } = require('../services/emailService');
 const { createRateLimiter } = require('../middleware/rateLimit');
+const { setAuthCookies, clearAuthCookies, getRefreshTokenFromCookie } = require('../utils/authCookies');
 
 const loginLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000,
@@ -24,6 +25,16 @@ const refreshLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000,
   max: 60,
   message: 'Too many token refresh attempts. Please sign in again later.'
+});
+const passwordResetLimiter = createRateLimiter({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  message: 'Too many password reset requests. Please try again later.'
+});
+const verificationLimiter = createRateLimiter({
+  windowMs: 60 * 60 * 1000,
+  max: 10,
+  message: 'Too many verification requests. Please try again later.'
 });
 
 const validEmail = (value) => typeof value === 'string'
@@ -218,7 +229,7 @@ router.post('/register', registrationLimiter, async (req, res) => {
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email: normalizedEmail,
       password,
-      email_confirm: true
+      email_confirm: false
     });
 
     if (authError) {
@@ -252,6 +263,30 @@ router.post('/register', registrationLimiter, async (req, res) => {
       });
     }
 
+    // Generate an email-verification link and send it via our email service
+    // so the user must confirm ownership before email is trusted for recovery.
+    try {
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+      const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
+        type: 'signup',
+        email: normalizedEmail,
+        options: { redirectTo: `${frontendUrl}/login?verified=true` },
+      });
+
+      if (!linkError && linkData?.properties?.action_link) {
+        sendEmailVerification({
+          to: normalizedEmail,
+          userName: normalizedName,
+          verificationUrl: linkData.properties.action_link,
+        }).catch(err => console.error('[AUTH] Verification email failed:', err.message));
+      } else if (linkError) {
+        console.error('[AUTH] generateLink error:', linkError.message);
+      }
+    } catch (verifyErr) {
+      // Verification email is best-effort — don't fail registration
+      console.error('[AUTH] Verification email setup failed:', verifyErr.message);
+    }
+
     const { data: sessionData, error: sessionError } = await supabase.auth.signInWithPassword({
       email: normalizedEmail,
       password
@@ -282,8 +317,11 @@ router.post('/register', registrationLimiter, async (req, res) => {
       console.error('[AUTH] Error queueing welcome email:', emailErr.message);
     }
 
+    setAuthCookies(res, sessionData.session);
+
     res.status(201).json({
-      message: 'Registration successful',
+      message: 'Registration successful. Please check your email to verify your account.',
+      email_verified: false,
       user: {
         id: authData.user.id,
         email: authData.user.email,
@@ -341,8 +379,11 @@ router.post('/login', loginLimiter, async (req, res) => {
       });
     }
 
+    setAuthCookies(res, data.session);
+
     res.json({
       message: 'Login successful',
+      email_verified: Boolean(data.user.email_confirmed_at || data.user.user_metadata?.email_verified),
       user: {
         id: data.user.id,
         email: data.user.email,
@@ -369,14 +410,25 @@ router.post('/logout', authenticateUser, async (req, res) => {
     const authHeader = req.headers.authorization;
     const token = authHeader.substring(7);
 
-    const { error } = await supabase.auth.admin.signOut(token);
-
-    if (error) {
-      return res.status(500).json({
-        error: 'Logout failed',
-        message: 'The request could not be completed.'
+    // Best-effort: revoke the session on the Supabase GoTrue server.
+    // supabase.auth.admin.signOut does not exist in supabase-js v2, so we
+    // call the GoTrue logout endpoint directly with the user's access token.
+    try {
+      await fetch(`${process.env.SUPABASE_URL}/auth/v1/logout`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'apikey': process.env.SUPABASE_ANON_KEY,
+          'Content-Type': 'application/json',
+        },
       });
+    } catch (revokeErr) {
+      // Best-effort — don't fail the logout request
+      console.error('[AUTH] Session revocation failed (non-fatal):', revokeErr.message);
     }
+
+    // Always clear auth cookies so the client can't refresh the session.
+    clearAuthCookies(res);
 
     res.json({
       message: 'Logout successful'
@@ -384,16 +436,19 @@ router.post('/logout', authenticateUser, async (req, res) => {
 
   } catch (error) {
     console.error('Logout error:', error);
-    res.status(500).json({
-      error: 'Logout failed',
-      message: 'The request could not be completed.'
+    // Still clear cookies and return success — logout should never fail
+    clearAuthCookies(res);
+    res.json({
+      message: 'Logout successful'
     });
   }
 });
 
 router.post('/refresh', refreshLimiter, async (req, res) => {
   try {
-    const { refresh_token } = req.body;
+    // Prefer the HttpOnly refresh_token cookie; fall back to the request body
+    // for backward compatibility with older frontend builds.
+    const refresh_token = getRefreshTokenFromCookie(req) || req.body?.refresh_token;
 
     if (typeof refresh_token !== 'string' || refresh_token.length < 20 || refresh_token.length > 4096) {
       return res.status(400).json({
@@ -406,11 +461,14 @@ router.post('/refresh', refreshLimiter, async (req, res) => {
     });
 
     if (error) {
+      clearAuthCookies(res);
       return res.status(401).json({
         error: 'Token refresh failed',
         message: 'The refresh token is invalid or expired.'
       });
     }
+
+    setAuthCookies(res, data.session);
 
     res.json({
       message: 'Token refreshed',
