@@ -208,8 +208,8 @@ dependency manifest for reference.
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/Yash-Javnjal/Extra-To-Essential.git
-cd Extra-To-Essential
+git clone https://github.com/Tanishq747Shivasharan/E2E.git
+cd E2E
 ```
 
 ### 2. Backend setup
