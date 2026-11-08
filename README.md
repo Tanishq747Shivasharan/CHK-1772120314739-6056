@@ -1,25 +1,67 @@
-# Extra-To-Essential 🌍
+# Extra-to-Essential
 
-[![React](https://img.shields.io/badge/React-19.2.4-blue.svg)](https://reactjs.org/)
-[![Node.js](https://img.shields.io/badge/Node.js-22.22.1-green.svg)](https://nodejs.org/)
-[![Express](https://img.shields.io/badge/Express-5.2.1-lightgrey.svg)](https://expressjs.com/)
-[![Socket.IO](https://img.shields.io/badge/Socket.IO-4.8.1-black.svg)](https://socket.io/)
+A real-time surplus food redistribution platform that connects donors with
+verified NGOs through an intelligent geolocation-based matching system. The
+platform routes surplus food from where it is wasted to where it is needed,
+with volunteer-coordinated pickup and delivery, live status tracking, impact
+metrics, and carbon credit accounting.
 
-## 📖 Introduction
-
-Extra-To-Essential is a real-time resource redistribution platform that bridges the gap between surplus and need. The platform connects donors with verified NGOs through an intelligent geolocation-based matching system, ensuring that essential resources like food, clothing, and other necessities reach those who need them most.
-
-Built with modern web technologies, the platform provides real-time tracking, live notifications, multi-language support, and role-based dashboards to create an efficient ecosystem for resource redistribution.
+[![React](https://img.shields.io/badge/React-19-blue.svg)](https://reactjs.org/)
+[![Node.js](https://img.shields.io/badge/Node.js-18%2B-green.svg)](https://nodejs.org/)
+[![Express](https://img.shields.io/badge/Express-5-lightgrey.svg)](https://expressjs.com/)
+[![Socket.IO](https://img.shields.io/badge/Socket.IO-4-black.svg)](https://socket.io/)
+[![Supabase](https://img.shields.io/badge/Supabase-Postgres-emerald.svg)](https://supabase.com/)
 
 ---
 
-## 💡 Core Concept
+## Table of Contents
 
-**Surplus resources should not be wasted when they can help someone in need.**
+1. [Introduction](#introduction)
+2. [Core Concept](#core-concept)
+3. [Platform Roles](#platform-roles)
+4. [System Workflow](#system-workflow)
+5. [Features](#features)
+6. [Technology Stack](#technology-stack)
+7. [Prerequisites](#prerequisites)
+8. [Installation](#installation)
+9. [Environment Variables](#environment-variables)
+10. [Running the Project](#running-the-project)
+11. [Project Structure](#project-structure)
+12. [API Reference](#api-reference)
+13. [Multi-language Support](#multi-language-support)
+14. [Available Scripts](#available-scripts)
+15. [Contributing](#contributing)
+16. [License](#license)
+17. [Developers](#developers)
+18. [Acknowledgments](#acknowledgments)
+19. [Project Status](#project-status)
 
-Extra-To-Essential eliminates the logistical disconnect between donors and NGOs by providing:
+---
+
+## Introduction
+
+Extra-to-Essential is a full-stack web application built to reduce food waste
+by streamlining the flow of surplus food from donors to NGOs and the
+communities they serve. The platform provides real-time donation listing,
+proximity-based donor-to-NGO matching, volunteer coordination for pickup and
+delivery, live notifications, role-based dashboards, and an impact analytics
+layer that quantifies meals saved and carbon-equivalent emissions avoided.
+
+The system is designed around four roles (Donor, NGO, Volunteer, and Admin),
+each with a scoped dashboard and a clear set of responsibilities. Authentication
+is handled by Supabase Auth, with role and verification state enforced server-side.
+
+---
+
+## Core Concept
+
+Surplus resources should not be wasted when they can help someone in need.
+
+The platform removes the logistical disconnect between donors and NGOs by
+providing:
+
 - Real-time donation listing and tracking
-- Geolocation-based matching of donors with nearby NGOs
+- Geolocation-based matching of donors with nearby verified NGOs
 - Volunteer coordination for pickup and delivery
 - Live status updates and notifications
 - Impact metrics and carbon credit tracking
@@ -28,389 +70,480 @@ Extra-To-Essential eliminates the logistical disconnect between donors and NGOs 
 
 ## Platform Roles
 
-The system operates through four primary roles.
-
 ### Donor
-The donor provides surplus items such as food or clothing.  
-Responsibilities:
-- Create donation listings  
-- Provide location details  
-- Monitor donation status  
-- Track delivery progress  
 
----
+Individuals or organizations with surplus food. Donors create listings with
+item details, quantity, and pickup location, then track the donation through
+to delivery and view their accumulated impact.
 
 ### NGO
-NGOs act as receivers and coordinators of donations.  
-Responsibilities:
-- View nearby donations  
-- Accept listings  
-- Assign volunteers  
-- Confirm successful delivery  
 
----
+Verified organizations that receive and redistribute donations. NGOs browse
+nearby available listings, accept listings, assign volunteers for pickup, and
+confirm successful deliveries.
 
 ### Volunteer
-Volunteers handle the physical movement of donations.  
-Responsibilities:
-- Receive assigned pickups  
-- Navigate to donor location  
-- Deliver items to NGO  
-- Update delivery status  
 
----
+Individuals who facilitate the physical transfer of donations. Volunteers
+receive pickup assignments, verify a donor-issued collection code, transport
+items to the NGO, and update delivery status.
 
 ### Admin
-Administrators maintain system integrity.  
-Responsibilities:
-- Verify NGOs  
-- Monitor activity  
-- Resolve issues  
-- Manage platform data  
+
+Platform administrators who maintain system integrity. Admins verify NGO and
+donor registrations, monitor platform activity, and access system analytics.
 
 ---
 
 ## System Workflow
 
-1. Donor creates a listing.
-2. Nearby NGOs receive notification.
-3. NGO accepts listing.
-4. Volunteer is assigned.
-5. Volunteer picks up donation.
-6. Delivery is completed.
-7. Status updates in real time.
+```
+1. Donor creates listing
+2. Nearby NGOs are notified
+3. NGO accepts the listing
+4. Volunteer is assigned (or self-accepts)
+5. Volunteer verifies the donor collection code and picks up items
+6. Volunteer delivers items to the NGO and confirms completion
+7. Impact metrics and carbon credits are updated
+```
+
+State transitions are enforced server-side: a delivery moves from `assigned`
+to `in_transit` to `delivered` (or `failed`), with each transition validated
+against the previous state.
 
 ---
 
 ## Features
 
-- Real-time donation tracking  
-- Geolocation-based matching  
-- Verified NGO system  
-- Live notifications  
-- Role-based dashboards  
-- Impact monitoring metrics  
-- Secure authentication  
-- Scalable architecture  
+### Core
+
+- **Real-time tracking** of donation status over Socket.IO
+- **Geolocation matching** between donors and nearby verified NGOs
+- **NGO verification** gated behind admin approval
+- **Live notifications** for all stakeholders
+- **Role-based dashboards** for donor, NGO, volunteer, and admin
+
+### Advanced
+
+- **Multi-language support** via i18next (English, Hindi, Kannada, Marathi, Telugu)
+- **Carbon credit tracking** and environmental impact visualization
+- **Impact metrics** including meals saved and CO2 equivalent
+- **Interactive maps** powered by Leaflet
+- **Secure authentication** with server-side role enforcement
+- **Transactional email** via Nodemailer
+- **Donor collection code (OTP)** verification for pickup handover
 
 ---
 
-## 👥 Platform Roles
-
-### 🎁 Donor
-Individuals or organizations with surplus resources.
-
-**Capabilities:**
-- Create and manage donation listings
-- Provide item details and location
-- Track donation status in real-time
-- View delivery progress and confirmation
-- Access impact metrics and carbon credits
-
-### 🏢 NGO (Non-Governmental Organization)
-Verified organizations that receive and distribute donations.
-
-**Capabilities:**
-- Browse nearby available donations
-- Accept listings based on needs
-- Assign volunteers for pickup
-- Confirm successful deliveries
-- Track impact and distribution metrics
-
-### 🚚 Volunteer
-Individuals who facilitate the physical transfer of donations.
-
-**Capabilities:**
-- Receive pickup assignments
-- Navigate to donor locations
-- Transport items to NGOs
-- Update delivery status
-- Track contribution history
-
-### 🛡️ Admin
-Platform administrators who ensure system integrity.
-
-**Capabilities:**
-- Verify and approve NGO registrations
-- Monitor platform activity
-- Manage user accounts
-- Resolve disputes and issues
-- Access system logs and analytics
-
----
-
-## 🔄 System Workflow
-
-```
-1. 📝 Donor creates listing → 2. 🔔 NGOs notified → 3. ✅ NGO accepts
-                                                              ↓
-7. 📊 Impact tracked ← 6. ✓ Delivery confirmed ← 5. 🚚 Volunteer delivers ← 4. 👤 Volunteer assigned
-```
-
-**Detailed Flow:**
-1. Donor creates a donation listing with item details and location
-2. System notifies nearby verified NGOs via real-time notifications
-3. NGO reviews and accepts the listing
-4. NGO assigns an available volunteer for pickup
-5. Volunteer picks up items from donor location
-6. Volunteer delivers items to NGO and confirms completion
-7. System updates impact metrics and carbon credits
-
----
-
-## ✨ Key Features
-
-### Core Functionality
-- 🔴 **Real-time Tracking** - Live donation status updates via Socket.IO
-- 📍 **Geolocation Matching** - Intelligent proximity-based donor-NGO pairing
-- ✓ **NGO Verification** - Admin-approved organization system
-- 🔔 **Live Notifications** - Instant updates for all stakeholders
-- 📊 **Role-based Dashboards** - Customized interfaces for each user type
-
-### Advanced Features
-- 🌍 **Multi-language Support** - i18n integration (English, Hindi, Kannada, Marathi, Telugu)
-- 🌱 **Carbon Credit Tracking** - Environmental impact visualization
-- 📈 **Impact Metrics** - Real-time donation and delivery statistics
-- 🗺️ **Interactive Maps** - Leaflet-powered location visualization
-- 🔐 **Secure Authentication** - Firebase-based auth with role management
-- 📧 **Email Notifications** - Automated updates via Nodemailer
-- 🎨 **Smooth Animations** - GSAP and Framer Motion powered UI
-
----
-
-## 🛠️ Technology Stack
+## Technology Stack
 
 ### Frontend
+
 | Technology | Version | Purpose |
 |------------|---------|---------|
-| React | 19.2.4 | UI framework |
-| Vite | 7.3.1 | Build tool |
-| React Router | 7.13.1 | Navigation |
-| GSAP | 3.14.2 | Animations |
-| Framer Motion | 12.34.3 | UI animations |
-| Leaflet | 1.9.4 | Maps |
-| Socket.IO Client | 4.8.3 | Real-time communication |
-| Supabase | 2.97.0 | Database client |
-| i18next | 23.16.8 | Internationalization |
-| Lucide React | 0.564.0 | Icons |
-| Lenis | 1.3.17 | Smooth scrolling |
+| React | 19 | UI framework |
+| Vite | 7 | Build tool and dev server |
+| React Router | 7 | Client-side routing |
+| GSAP | 3 | Timeline animations |
+| Framer Motion | 12 | Declarative UI animations |
+| Leaflet | 1.9 | Interactive maps |
+| React-Leaflet | 5 | React bindings for Leaflet |
+| Socket.IO Client | 4 | Real-time communication |
+| Supabase JS | 2 | Database and auth client |
+| i18next | 23 | Internationalization |
+| Lucide React | 0.564 | Icon set |
+| Lenis | 1.3 | Smooth scrolling |
 
 ### Backend
+
 | Technology | Version | Purpose |
 |------------|---------|---------|
-| Node.js | 22.22.1 | Runtime |
-| Express | 5.2.1 | Web framework |
-| Socket.IO | 4.8.1 | Real-time engine |
-| Firebase Admin | 13.7.0 | Authentication |
-| Supabase | 2.99.0 | Database |
-| Nodemailer | 8.0.2 | Email service |
-| CORS | 2.8.6 | Cross-origin support |
+| Node.js | 18+ | JavaScript runtime |
+| Express | 5 | Web framework / HTTP API |
+| Socket.IO | 4 | Real-time WebSocket engine |
+| Supabase JS | 2 | Postgres database and auth (admin client) |
+| Firebase Admin | 13 | Push notifications only |
+| Nodemailer | 8 | Outbound email |
+| CORS | 2.8 | Cross-origin support |
+
+### Infrastructure
+
+| Service | Purpose |
+|---------|---------|
+| Supabase | Postgres database, Row Level Security, Auth, and Storage |
+| Firebase Cloud Messaging | Push notifications |
+| Nominatim (OpenStreetMap) | Geocoding and reverse geocoding |
 
 ---
 
-## 📦 Installation
+## Prerequisites
 
-### Prerequisites
-- Node.js 18+ installed
-- npm or yarn package manager
-- Firebase project setup
-- Supabase project setup
+Before you begin, ensure you have the following:
 
-### 1. Clone Repository
+- **Node.js** 18 or newer (Node 20 LTS recommended). Download it from
+  [nodejs.org](https://nodejs.org/).
+- **npm** (bundled with Node.js) or **yarn**.
+- A **Supabase** project with the project URL, anon key, and service role key.
+  Create one at [supabase.com](https://supabase.com/).
+- A **Firebase** service account (for push notifications) from the
+  [Firebase Console](https://console.firebase.google.com/).
+- A **Gmail** account with an App Password (or any SMTP provider) for
+  outbound email.
+
+---
+
+## Installation
+
+This repository contains two applications: a backend API (`E-to-E_backend`)
+and a frontend client (`e-to-e_frontend`). Each is a Node.js project and is
+installed with `npm install`, which reads its `package.json`. A
+`requirements.txt` file is also included in each folder as a human-readable
+dependency manifest for reference.
+
+> Note: This is a Node.js project. Unlike Python projects, Node.js does not
+> read `requirements.txt` during installation; npm installs from `package.json`.
+> The `requirements.txt` files here are provided only as a readable bill of
+> materials.
+
+### 1. Clone the repository
+
 ```bash
 git clone https://github.com/Yash-Javnjal/Extra-To-Essential.git
 cd Extra-To-Essential
 ```
 
-### 2. Backend Setup
+### 2. Backend setup
+
 ```bash
 cd E-to-E_backend
 npm install
 ```
 
-Create `.env` file in `E-to-E_backend/`:
-```env
-PORT=5000
-FIREBASE_PROJECT_ID=your_project_id
-FIREBASE_PRIVATE_KEY=your_private_key
-FIREBASE_CLIENT_EMAIL=your_client_email
-SUPABASE_URL=your_supabase_url
-SUPABASE_KEY=your_supabase_key
-EMAIL_USER=your_email
-EMAIL_PASS=your_email_password
-```
+Create a `.env` file in `E-to-E_backend/` (see [Environment Variables](#environment-variables)).
+You will need your Supabase project URL, anon key, service role key, and
+Firebase service-account credentials. See `E-to-E_backend/.env.example` if
+present, otherwise model it on the variables listed below.
 
-Start backend server:
-```bash
-npm start
-```
+### 3. Frontend setup
 
-### 3. Frontend Setup
 ```bash
 cd ../e-to-e_frontend
 npm install
 ```
 
-Create `.env` file in `e-to-e_frontend/`:
+Create a `.env` file in `e-to-e_frontend/` (see
+[Environment Variables](#environment-variables)).
+
+### 4. Apply the database schema
+
+Apply the SQL files in `E-to-E_backend/migrations/` to your Supabase project,
+in numeric order. These create the tables, triggers, Postgres functions, and
+Row Level Security policies the API depends on.
+
+---
+
+## Environment Variables
+
+Never commit real secrets. Both `.env` files are gitignored. Use placeholder
+values when sharing configuration, and provide real values only in your local
+environment.
+
+### Backend (`E-to-E_backend/.env`)
+
+| Variable | Description |
+|----------|-------------|
+| `PORT` | Port the API server listens on (e.g. `5000`) |
+| `NODE_ENV` | `development` or `production` |
+| `CORS_ORIGIN` | Comma-separated list of allowed frontend origins |
+| `SUPABASE_URL` | Your Supabase project URL |
+| `SUPABASE_ANON_KEY` | Supabase anon (public) key |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key (server only; bypasses RLS) |
+| `FIREBASE_PROJECT_ID` | Firebase project ID |
+| `FIREBASE_CLIENT_EMAIL` | Firebase service-account client email |
+| `FIREBASE_PRIVATE_KEY` | Firebase service-account private key (PEM) |
+| `EMAIL_HOST` | SMTP host (e.g. `smtp.gmail.com`) |
+| `EMAIL_PORT` | SMTP port (e.g. `587`) |
+| `EMAIL_USER` | SMTP username |
+| `EMAIL_PASS` | SMTP password or app password |
+| `EMAIL_FROM` | Sender display name and address |
+| `OTP_HASH_SECRET` | Secret used to hash delivery collection codes |
+| `FRONTEND_URL` | Frontend base URL used in email links |
+
+Example:
+
 ```env
-VITE_SUPABASE_URL=your_supabase_url
-VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
-VITE_FIREBASE_API_KEY=your_firebase_api_key
-VITE_FIREBASE_AUTH_DOMAIN=your_auth_domain
-VITE_FIREBASE_PROJECT_ID=your_project_id
-VITE_BACKEND_URL=http://localhost:5000
+PORT=5000
+NODE_ENV=development
+CORS_ORIGIN=http://localhost:5173
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_ANON_KEY=your_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+FIREBASE_PROJECT_ID=your_project_id
+FIREBASE_CLIENT_EMAIL=your_client_email
+FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_USER=your_email@gmail.com
+EMAIL_PASS=your_app_password
+EMAIL_FROM="Smart Surplus Food System <your_email@gmail.com>"
+OTP_HASH_SECRET=your_long_random_secret
+FRONTEND_URL=http://localhost:5173
 ```
 
-Start development server:
+### Frontend (`e-to-e_frontend/.env`)
+
+| Variable | Description |
+|----------|-------------|
+| `VITE_SUPABASE_URL` | Your Supabase project URL |
+| `VITE_SUPABASE_ANON_KEY` | Supabase anon (public) key |
+| `VITE_API_URL` | Backend API base URL (e.g. `http://localhost:5000/api`) |
+
+Example:
+
+```env
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your_anon_key
+VITE_API_URL=http://localhost:5000/api
+```
+
+---
+
+## Running the Project
+
+Start the backend first, then the frontend.
+
+### Backend
+
+From `E-to-E_backend/`:
+
+```bash
+npm run dev      # development (auto-restart with nodemon)
+# or
+npm start        # production (plain node)
+```
+
+The API will be available at `http://localhost:5000`. A health check is at
+`GET /health`.
+
+### Frontend
+
+From `e-to-e_frontend/`:
+
 ```bash
 npm run dev
 ```
 
-The application will be available at `http://localhost:5173`
+The development server runs at `http://localhost:5173` by default and proxies
+requests to the backend using `VITE_API_URL`.
 
 ---
 
-## 🗂️ Project Structure
+## Project Structure
 
 ```
 Extra-To-Essential/
 ├── E-to-E_backend/
-│   ├── config/              # Firebase & Supabase configuration
-│   ├── middleware/          # Auth & role guard middleware
-│   ├── routes/              # API endpoints
+│   ├── config/              # Supabase and Firebase Admin configuration
+│   ├── middleware/          # Authentication, role guards, rate limiting
+│   ├── migrations/          # SQL schema, triggers, functions, and RLS policies
+│   ├── routes/              # API route handlers
 │   │   ├── admin.js         # Admin operations
-│   │   ├── auth.js          # Authentication
+│   │   ├── auth.js          # Authentication and sessions
 │   │   ├── claims.js        # Donation claims
-│   │   ├── deliveries.js    # Delivery tracking
+│   │   ├── deliveries.js    # Delivery tracking and OTP verification
 │   │   ├── donors.js        # Donor management
-│   │   ├── geocode.js       # Location services
-│   │   ├── impact.js        # Impact metrics
+│   │   ├── geocode.js       # Forward and reverse geocoding proxy
+│   │   ├── impact.js        # Impact analytics
 │   │   ├── listings.js      # Donation listings
-│   │   └── ngos.js          # NGO management
-│   ├── services/            # Business logic
-│   ├── templates/           # Email templates
-│   ├── utils/               # Helper functions
-│   └── server.js            # Entry point
+│   │   └── ngos.js          # NGO and volunteer management
+│   ├── services/            # Business logic (email, geocoding, impact, tracking)
+│   ├── templates/           # HTML email templates
+│   ├── utils/               # Mailer transport
+│   ├── requirements.txt     # Backend dependency manifest (reference)
+│   └── server.js            # Application entry point
 │
 └── e-to-e_frontend/
     ├── public/
     │   └── locales/         # i18n translation files
-    └── src/
-        ├── admin/           # Admin dashboard components
-        ├── components/      # Reusable UI components
-        │   ├── auth/        # Authentication components
-        │   ├── CarbonWallet/# Carbon credit tracking
-        │   └── LanguageSwitcher/
-        ├── donor/           # Donor dashboard
-        ├── ngo/             # NGO dashboard
-        ├── volunteer/       # Volunteer dashboard
-        └── App.jsx          # Root component
+    ├── src/
+    │   ├── admin/             # Admin dashboard views
+    │   ├── components/        # Shared UI (Navbar, Hero, Footer, auth, CarbonWallet, LanguageSwitcher)
+    │   ├── context/          # React context providers
+    │   ├── i18n/             # Internationalization configuration
+    │   ├── lib/              # Client API and Supabase helpers
+    │   ├── modules/          # Feature modules (NGODashboard)
+    │   ├── pages/            # Route pages (Auth, Contact, Landing, Stories)
+    │   ├── sections/         # Landing page sections
+    │   ├── styles/           # Global styles
+    │   ├── DonorDashboard/   # Donor dashboard views
+    │   ├── VolunteerDashboard/ # Volunteer dashboard views
+    │   ├── App.jsx           # Root component and routes
+    │   └── main.jsx          # React entry point
+    ├── requirements.txt     # Frontend dependency manifest (reference)
+    └── index.html            # HTML shell
 ```
 
 ---
 
-## 🔌 API Endpoints
+## API Reference
+
+All protected endpoints require a Bearer access token in the `Authorization`
+header, issued by Supabase Auth on login or registration. Roles and
+verification state are enforced server-side.
 
 ### Authentication
-- `POST /api/auth/register` - User registration
-- `POST /api/auth/login` - User login
-- `GET /api/auth/verify` - Token verification
+
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| POST | `/api/auth/register` | Register a donor, NGO, or volunteer | Public |
+| POST | `/api/auth/login` | Email and password login | Public |
+| POST | `/api/auth/oauth/profile` | Create a profile after Google sign-in | Bearer |
+| POST | `/api/auth/logout` | Revoke the current session | Bearer |
+| POST | `/api/auth/refresh` | Refresh an expired access token | Public |
+| GET | `/api/auth/me` | Get the authenticated user's profile | Bearer |
 
 ### Listings
-- `GET /api/listings` - Get all listings
-- `POST /api/listings` - Create new listing
-- `GET /api/listings/:id` - Get listing details
-- `PUT /api/listings/:id` - Update listing
-- `DELETE /api/listings/:id` - Delete listing
 
-### Claims & Deliveries
-- `POST /api/claims` - Claim a listing
-- `GET /api/deliveries` - Get deliveries
-- `PUT /api/deliveries/:id` - Update delivery status
+| Method | Endpoint | Description | Role |
+|--------|----------|-------------|------|
+| GET | `/api/listings` | List available listings | Authenticated |
+| GET | `/api/listings/my` | List the donor's own listings | Donor |
+| GET | `/api/listings/search` | Search open listings by food type | Authenticated |
+| GET | `/api/listings/:listing_id` | Get a single listing | Authenticated |
+| POST | `/api/listings` | Create a listing | Donor |
+| PUT | `/api/listings/:listing_id` | Update a listing (owner only) | Donor |
+| DELETE | `/api/listings/:listing_id` | Delete an unclaimed listing (owner only) | Donor |
 
-### Admin
-- `GET /api/admin/ngos/pending` - Get pending NGO verifications
-- `PUT /api/admin/ngos/:id/verify` - Verify NGO
-- `GET /api/admin/stats` - Get platform statistics
+### Claims and Deliveries
 
----
+| Method | Endpoint | Description | Role |
+|--------|----------|-------------|------|
+| POST | `/api/claims` | Claim a listing and open a delivery | NGO |
+| GET | `/api/claims/my` | List the NGO's claims | NGO |
+| GET | `/api/claims/:claim_id` | Get a claim (owner, donor, or assigned volunteer) | Authenticated |
+| PUT | `/api/claims/:claim_id` | Update claim scheduling notes | NGO |
+| DELETE | `/api/claims/:claim_id` | Withdraw a claim | NGO |
+| GET | `/api/deliveries/my` | List deliveries for the caller's role | Authenticated |
+| GET | `/api/deliveries/:delivery_id` | Get a delivery (participant or admin) | Authenticated |
+| PUT | `/api/deliveries/:delivery_id/status` | Transition delivery status | NGO |
+| PUT | `/api/deliveries/:delivery_id/assign` | Assign a no-login volunteer | NGO |
+| POST | `/api/deliveries/:delivery_id/accept` | Volunteer self-accepts a pickup | Volunteer |
+| POST | `/api/deliveries/:delivery_id/verify-otp` | Verify the donor collection code | Volunteer |
+| POST | `/api/deliveries/:delivery_id/location` | Update live volunteer location | Volunteer |
+| POST | `/api/deliveries/:delivery_id/cancel` | Release an accepted pickup | Volunteer |
+| POST | `/api/deliveries/:delivery_id/resend-code` | Re-issue the donor collection code | Donor |
 
-## 🌐 Multi-language Support
+### Donors, NGOs, and Volunteers
 
-Supported languages:
-- 🇬🇧 English (en)
-- 🇮🇳 Hindi (hi)
-- 🇮🇳 Kannada (kn)
-- 🇮🇳 Marathi (mr)
-- 🇮🇳 Telugu (te)
+| Method | Endpoint | Description | Role |
+|--------|----------|-------------|------|
+| GET | `/api/donors/me` | Get the donor's profile | Donor |
+| PUT | `/api/donors/me` | Update the donor's profile | Donor |
+| GET | `/api/donors/:donor_id` | Get a donor (limited fields) | NGO, Admin |
+| PUT | `/api/donors/:donor_id/verify` | Verify a donor | Admin |
+| GET | `/api/ngos` | List NGOs | Authenticated |
+| GET | `/api/ngos/me` | Get the NGO's profile | NGO |
+| PUT | `/api/ngos/me` | Update the NGO's profile | NGO |
+| GET | `/api/ngos/:ngo_id` | Get an NGO | Authenticated |
+| PUT | `/api/ngos/:ngo_id/verify` | Verify an NGO | Admin |
+| POST | `/api/ngos/me/volunteers` | Add a volunteer record | NGO |
+| GET | `/api/ngos/me/volunteers` | List the NGO's volunteers | NGO |
+| PUT | `/api/ngos/me/volunteers/:volunteer_id` | Update a volunteer record | NGO |
+| DELETE | `/api/ngos/me/volunteers/:volunteer_id` | Remove a volunteer record | NGO |
 
-Translation files located in `e-to-e_frontend/public/locales/`
+### Impact, Geocoding, and Admin
 
-
----
-
-## 🚀 Development Scripts
-
-### Frontend
-```bash
-npm run dev      # Start development server
-npm run build    # Build for production
-npm run preview  # Preview production build
-npm run lint     # Run ESLint
-```
-
-### Backend
-```bash
-npm start        # Start server with nodemon
-```
-
----
-
-## 🤝 Contributing
-
-Contributions are welcome! Please follow these steps:
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
----
-
-## 📝 License
-
-This project is open source and available for educational and non-commercial use.
+| Method | Endpoint | Description | Role |
+|--------|----------|-------------|------|
+| GET | `/api/impact/total` | Platform-wide impact totals | Public |
+| GET | `/api/impact/leaderboard/donors` | Donor impact leaderboard | Public |
+| GET | `/api/impact/performance/ngos` | NGO performance ranking | Public |
+| GET | `/api/impact/summary` | The caller's impact and credits | Authenticated |
+| GET | `/api/impact/performance/volunteers` | Volunteer performance | Admin |
+| GET | `/api/geocode/reverse` | Reverse geocode coordinates | Public |
+| GET | `/api/geocode/search` | Forward geocode an address | Public |
+| GET | `/api/admin/impact-overview` | Platform impact overview | Admin |
 
 ---
 
-## 👨‍💻 Developers
+## Multi-language Support
 
-- **Yash Javanjal** - [GitHub](https://github.com/Yash-Javnjal)
-- **Tanishq Shivsharan**
+The interface supports five languages. Translation files live in
+`e-to-e_frontend/public/locales/` and are loaded by i18next with automatic
+browser-language detection.
 
----
-
-## 📧 Contact
-
-For questions, suggestions, or support, please open an issue on GitHub.
-
----
-
-## 🙏 Acknowledgments
-
-- Firebase for authentication services
-- Supabase for database infrastructure
-- Leaflet for mapping capabilities
-- Socket.IO for real-time communication
-- All contributors and supporters of the project
+- English (`en`)
+- Hindi (`hi`)
+- Kannada (`kn`)
+- Marathi (`mr`)
+- Telugu (`te`)
 
 ---
 
-## 📊 Project Status
+## Available Scripts
 
-🟢 **Active Development** - The platform is under active development with regular updates and improvements.
+### Frontend (`e-to-e_frontend/`)
+
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Start the Vite development server |
+| `npm run build` | Build for production into `dist/` |
+| `npm run preview` | Preview the production build locally |
+| `npm run lint` | Run ESLint |
+
+### Backend (`E-to-E_backend/`)
+
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Start the server with nodemon (auto-restart) |
+| `npm start` | Start the server with node |
 
 ---
 
-**Extra-To-Essential** - *Transforming surplus into support, one donation at a time.* 🌍💚
+## Contributing
+
+Contributions are welcome. Please follow these steps:
+
+1. Fork the repository.
+2. Create a feature branch (`git checkout -b feature/your-feature`).
+3. Commit your changes with a clear message.
+4. Push the branch (`git push origin feature/your-feature`).
+5. Open a pull request describing the change and what was tested.
+
+When adding new dependencies, prefer pinned versions and run `npm audit` before
+submitting. Do not commit `.env` files or real credentials.
+
+---
+
+## License
+
+This project is open source and available for educational and non-commercial
+use. See the `LICENSE` file for details.
+
+---
+
+## Developers
+
+- **Yash Javnjal** — [GitHub](https://github.com/Yash-Javnjal)
+- **Tanishq Shivasharan**
+
+---
+
+## Acknowledgments
+
+- [Supabase](https://supabase.com/) for the database, auth, and storage layer.
+- [Firebase](https://firebase.google.com/) for push notifications.
+- [Leaflet](https://leafletjs.com/) and [OpenStreetMap](https://www.openstreetmap.org/) for maps and geocoding.
+- [Socket.IO](https://socket.io/) for real-time communication.
+- All contributors and supporters of the project.
+
+---
+
+## Project Status
+
+Active development. The platform is under ongoing improvement; expect regular
+updates.
+
+---
+
+*Extra-to-Essential — transforming surplus into support, one donation at a time.*

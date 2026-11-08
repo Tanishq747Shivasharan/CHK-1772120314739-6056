@@ -1,0 +1,28 @@
+# =============================================================================
+# Extra-to-Essential — Backend Dependency Manifest
+# =============================================================================
+#
+# This is a Node.js project. Node.js does not use a requirements.txt file for
+# installation the way Python does; packages are declared in package.json and
+# locked in package-lock.json. To install everything, run:
+#
+#     npm install          # installs all dependencies listed below
+#     npm ci               # reproducible install from package-lock.json
+#
+# This file mirrors package.json and is provided as a human-readable bill of
+# materials. The canonical source of truth for npm is package.json.
+#
+# Runtime: Node.js 18 or newer (CommonJS modules)
+# -----------------------------------------------------------------------------
+
+# --- Runtime dependencies ---
+@supabase/supabase-js@^2.99.0     # Supabase client (Postgres + Auth)
+cors@^2.8.6                        # Cross-Origin Resource Sharing middleware
+dotenv@^17.3.1                     # Loads environment variables from .env
+express@^5.2.1                     # Web framework / HTTP API server
+firebase-admin@^13.7.0             # Firebase Admin SDK (push notifications only)
+nodemailer@^8.0.2                  # Outbound transactional email
+socket.io@^4.8.1                   # Real-time WebSocket engine
+
+# --- Development tooling (currently listed under dependencies in package.json) ---
+nodemon@^3.1.14                    # Auto-restart server on file changes (dev only)
