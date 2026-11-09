@@ -15,7 +15,7 @@ if (ALLOWED_ORIGINS.includes('*')) {
   throw new Error('CORS_ORIGIN must list specific trusted origins; wildcard origins are not allowed.');
 }
 
-app.set('trust proxy', false);
+app.set('trust proxy', 1);
 app.use((req, res, next) => {
   res.set({
     'X-Content-Type-Options': 'nosniff',
